@@ -1,6 +1,7 @@
 import type { ModuleDef } from "@rig/dsp-host";
 import { useEffect, useRef } from "react";
 import type { Pair, Rig } from "../audio";
+import { Envelope, toDb } from "../envelope";
 import { levelNear, powerDb } from "../fft";
 
 const F_MIN = 40;
@@ -8,12 +9,22 @@ const F_MAX = 16000;
 const DB_MIN = -100;
 const W = 900;
 const H = 200;
+const ENV_H = 110;
+const ENV_DB_MIN = -54;
+const ENV_DB_MAX = 6; // headroom above full scale, so a full-scale signal does not hug the edge
+const HISTORY = 160; // frames of envelope shown, about 7 s
 
 const rms = (x: Float32Array) =>
   Math.sqrt(x.reduce((a, v) => a + v * v, 0) / Math.max(1, x.length));
 
 /** Latest pair of frames, for tests and the debug hook. */
-let latest: { pair: Pair; before: Float32Array; after: Float32Array; rate: number } | null = null;
+let latest: {
+  pair: Pair;
+  before: Float32Array;
+  after: Float32Array;
+  rate: number;
+  envDb: [number, number];
+} | null = null;
 export const pairLevels = (freq = 110) =>
   latest && {
     slot: latest.pair.slot,
@@ -21,6 +32,8 @@ export const pairLevels = (freq = 110) =>
     after: rms(latest.pair.after),
     beforeDb: levelNear(latest.before, latest.rate, freq),
     afterDb: levelNear(latest.after, latest.rate, freq),
+    envBeforeDb: latest.envDb[0],
+    envAfterDb: latest.envDb[1],
   };
 
 const xOf = (f: number) => (Math.log(f / F_MIN) / Math.log(F_MAX / F_MIN)) * W;
@@ -74,15 +87,63 @@ function drawSpectra(
   trace(g, after, rate, "#ffb347");
 }
 
+function drawEnvelopes(c: HTMLCanvasElement, before: number[], after: number[]) {
+  const g = c.getContext("2d");
+  if (!g) return;
+  const y = (db: number) =>
+    ((ENV_DB_MAX - Math.max(ENV_DB_MIN, Math.min(ENV_DB_MAX, db))) / (ENV_DB_MAX - ENV_DB_MIN)) *
+    ENV_H;
+  g.fillStyle = "#0b0d0f";
+  g.fillRect(0, 0, W, ENV_H);
+  g.font = "11px 'IBM Plex Mono', monospace";
+  g.fillStyle = "#8d949b";
+  g.strokeStyle = "#1f2429";
+  g.lineWidth = 1;
+  for (const db of [0, -20, -40]) {
+    g.beginPath();
+    g.moveTo(0, y(db));
+    g.lineTo(W, y(db));
+    g.stroke();
+    g.fillText(`${db} dB`, 6, y(db) - 3);
+  }
+  for (const [series, colour] of [
+    [before, "#6b7680"],
+    [after, "#ffb347"],
+  ] as const) {
+    g.strokeStyle = colour;
+    g.lineWidth = 1.5;
+    g.beginPath();
+    series.forEach((db, i) => {
+      const x = W - ((series.length - 1 - i) / (HISTORY - 1)) * W; // newest at the right edge
+      if (i === 0) g.moveTo(x, y(db));
+      else g.lineTo(x, y(db));
+    });
+    g.stroke();
+  }
+}
+
 /** What the selected pedal is doing to the signal. */
 export function Inspector({ def, rig }: { def: ModuleDef; rig: Rig | null }) {
   const spec = useRef<HTMLCanvasElement>(null);
+  const env = useRef<HTMLCanvasElement>(null);
+  const gain = useRef<HTMLOutputElement>(null);
   useEffect(() => {
     latest = null;
-    return rig?.onPair((pair) => {
+    if (!rig) return;
+    const [inEnv, outEnv] = [new Envelope(rig.sampleRate), new Envelope(rig.sampleRate)];
+    const hist: [number[], number[]] = [[], []];
+    return rig.onPair((pair) => {
       const [before, after] = [powerDb(pair.before), powerDb(pair.after)];
-      latest = { pair, before, after, rate: rig.sampleRate };
+      const envDb: [number, number] = [toDb(inEnv.run(pair.before)), toDb(outEnv.run(pair.after))];
+      latest = { pair, before, after, rate: rig.sampleRate, envDb };
+      hist.forEach((h, i) => {
+        h.push(envDb[i] as number);
+        if (h.length > HISTORY) h.shift();
+      });
       if (spec.current) drawSpectra(spec.current, before, after, rig.sampleRate);
+      if (env.current) drawEnvelopes(env.current, hist[0], hist[1]);
+      const change = envDb[1] - envDb[0];
+      if (gain.current) gain.current.value = `${change >= 0 ? "+" : ""}${change.toFixed(1)} dB`;
     });
   }, [rig]);
   return (
@@ -94,6 +155,12 @@ export function Inspector({ def, rig }: { def: ModuleDef; rig: Rig | null }) {
         <canvas ref={spec} width={W} height={H} aria-label="Spectrum before and after" />
         <figcaption>
           <i className="key before" /> in <i className="key after" /> out
+        </figcaption>
+      </figure>
+      <figure>
+        <canvas ref={env} width={W} height={ENV_H} aria-label="Level over time, in and out" />
+        <figcaption>
+          level over the last few seconds · gain change <output ref={gain}>-</output>
         </figcaption>
       </figure>
     </section>

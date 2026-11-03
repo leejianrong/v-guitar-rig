@@ -55,3 +55,25 @@ test("before/after spectrum shows what the clipper adds, and follows the Level k
 
   await expect(page.getByLabel("Spectrum before and after")).toBeVisible();
 });
+
+test("level view: turning a pedal up shows as gain, and bypassing it makes in and out coincide", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Start audio" }).click();
+  await page.waitForFunction(() => window.__rig?.ready === true, undefined, { timeout: 30_000 });
+  await page.getByTestId("pedal-diode-clipper@1").getByRole("heading").click();
+  const gap = async () => {
+    const p = await page.evaluate(() => window.__rig?.pair());
+    return (p?.envAfterDb ?? 0) - (p?.envBeforeDb ?? 0);
+  };
+  await page.getByTestId("pedal-diode-clipper@1").getByRole("slider", { name: "Level" }).focus();
+  await page.keyboard.press("End"); // level x2 is about +6 dB
+  await expect.poll(gap).toBeGreaterThan(3);
+
+  await page.getByRole("button", { name: /^Diode Clipper on/ }).click();
+  await expect.poll(async () => Math.abs(await gap())).toBeLessThan(0.3);
+  await expect(page.getByRole("region", { name: "Pedal inspector" }).locator("output")).toHaveText(
+    /^[+-]0\.\d dB$/,
+  );
+});
