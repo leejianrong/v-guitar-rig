@@ -1,6 +1,7 @@
-import type { ModuleDef } from "@rig/dsp-host";
-import { useEffect, useRef } from "react";
-import type { Pair, Rig } from "../audio";
+import { type CurvePoint, type ModuleDef, measureTransfer } from "@rig/dsp-host";
+import type { Slot } from "@rig/shared";
+import { useEffect, useRef, useState } from "react";
+import { loadWasm, type Pair, type Rig } from "../audio";
 import { Envelope, toDb } from "../envelope";
 import { levelNear, powerDb } from "../fft";
 
@@ -12,6 +13,8 @@ const H = 200;
 const ENV_H = 110;
 const ENV_DB_MIN = -54;
 const ENV_DB_MAX = 6; // headroom above full scale, so a full-scale signal does not hug the edge
+const CURVE = 220; // square plot, in canvas pixels
+const CURVE_DB = [-60, 6] as const;
 const HISTORY = 160; // frames of envelope shown, about 7 s
 
 const rms = (x: Float32Array) =>
@@ -122,11 +125,73 @@ function drawEnvelopes(c: HTMLCanvasElement, before: number[], after: number[]) 
   }
 }
 
+function drawCurve(c: HTMLCanvasElement, curve: CurvePoint[]) {
+  const g = c.getContext("2d");
+  if (!g) return;
+  const [lo, hi] = CURVE_DB;
+  const at = (db: number) => ((Math.max(lo, Math.min(hi, db)) - lo) / (hi - lo)) * CURVE;
+  const [px, py] = [(db: number) => at(db), (db: number) => CURVE - at(db)];
+  g.fillStyle = "#0b0d0f";
+  g.fillRect(0, 0, CURVE, CURVE);
+  g.strokeStyle = "#1f2429";
+  g.fillStyle = "#8d949b";
+  g.font = "11px 'IBM Plex Mono', monospace";
+  g.lineWidth = 1;
+  for (const db of [-40, -20, 0]) {
+    g.beginPath();
+    g.moveTo(px(db), 0);
+    g.lineTo(px(db), CURVE);
+    g.moveTo(0, py(db));
+    g.lineTo(CURVE, py(db));
+    g.stroke();
+    g.fillText(`${db}`, px(db) + 3, CURVE - 4);
+    g.fillText(`${db}`, 4, py(db) - 3);
+  }
+  g.setLineDash([4, 4]); // unity: what a wire would do
+  g.strokeStyle = "#6b7680";
+  g.beginPath();
+  g.moveTo(px(lo), py(lo));
+  g.lineTo(px(hi), py(hi));
+  g.stroke();
+  g.setLineDash([]);
+  g.strokeStyle = "#ffb347";
+  g.lineWidth = 2;
+  g.beginPath();
+  curve.forEach((pt, i) => {
+    if (i === 0) g.moveTo(px(pt.inDb), py(pt.outDb));
+    else g.lineTo(px(pt.inDb), py(pt.outDb));
+  });
+  g.stroke();
+}
+
 /** What the selected pedal is doing to the signal. */
-export function Inspector({ def, rig }: { def: ModuleDef; rig: Rig | null }) {
+export function Inspector({ def, slot, rig }: { def: ModuleDef; slot: Slot; rig: Rig | null }) {
   const spec = useRef<HTMLCanvasElement>(null);
   const env = useRef<HTMLCanvasElement>(null);
   const gain = useRef<HTMLOutputElement>(null);
+  const curveCanvas = useRef<HTMLCanvasElement>(null);
+  const [summary, setSummary] = useState("measuring...");
+
+  // Measured on a copy of the module, a moment after the last knob move, so it never touches the live one.
+  const params = JSON.stringify(slot.params);
+  useEffect(() => {
+    let live = true;
+    const t = setTimeout(async () => {
+      const curve = measureTransfer(def, await loadWasm(), JSON.parse(params));
+      const [first, last] = [curve[0], curve[curve.length - 1]];
+      if (!live || !first || !last || !curveCanvas.current) return;
+      drawCurve(curveCanvas.current, curve);
+      const small = first.outDb - first.inDb;
+      const top = Math.max(...curve.map((c) => c.outDb));
+      setSummary(
+        `quiet notes ${small >= 0 ? "+" : ""}${small.toFixed(1)} dB, loudest output ${top.toFixed(1)} dB`,
+      );
+    }, 120);
+    return () => {
+      live = false;
+      clearTimeout(t);
+    };
+  }, [def, params]);
   useEffect(() => {
     latest = null;
     if (!rig) return;
@@ -155,6 +220,18 @@ export function Inspector({ def, rig }: { def: ModuleDef; rig: Rig | null }) {
         <canvas ref={spec} width={W} height={H} aria-label="Spectrum before and after" />
         <figcaption>
           <i className="key before" /> in <i className="key after" /> out
+        </figcaption>
+      </figure>
+      <figure>
+        <canvas
+          ref={curveCanvas}
+          width={CURVE}
+          height={CURVE}
+          className="curve"
+          aria-label="Transfer curve: level out against level in"
+        />
+        <figcaption data-testid="curve-summary">
+          measured transfer curve (dashed: a plain wire) · {summary}
         </figcaption>
       </figure>
       <figure>
