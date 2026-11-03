@@ -26,7 +26,7 @@ A web app (plus local daemon) where you plug a guitar into your audio interface 
 - Library browser for pedals, amps, cabs and boards; board editor with knobs, bypass, reorder.
 - Module kinds: behavioral TypeScript, one circuit-solved pedal, NAM capture for shipped amp presets (ADR-0003).
 - Live waveform, spectrogram, and host-drawn per-effect visuals (ADR-0005).
-- Daemon in docker compose with HTTP/WS API, CLI and MCP; offline render with parity to the browser.
+- Daemon in docker compose with an HTTP API plus server-sent events, CLI and MCP; offline render with parity to the browser.
 - Vibe-coding behavioral pedals and amps safely (ADR-0004).
 - Preset-first prompt-to-tone search and knob tuning (ADR-0006).
 - A shipped starter library with original names, no brand names or logos.
@@ -57,7 +57,7 @@ A web app (plus local daemon) where you plug a guitar into your audio interface 
 | Part | Mechanism | ADR |
 |------|-----------|-----|
 | S1 | Rust DSP core compiled to WASM (solver, convolver, oversampler) hosted in an AudioWorklet and in Node | ADR-0001 |
-| S2 | Daemon: single write path HTTP/WS → validate → rev check → persist file → broadcast; MCP and CLI call it | ADR-0002 |
+| S2 | Daemon: single write path HTTP → validate → rev check → persist file → broadcast over server-sent events; MCP and CLI call it | ADR-0002 |
 | S3 | Module registry with three kinds sharing one param schema | ADR-0003 |
 | S4 | Safety gate and sandbox: worklet scope, Node worker with permissions, stability tests, auto-bypass, master limiter | ADR-0004 |
 | S5 | Analysis taps (ring buffer) and host-drawn visuals on the main thread / OffscreenCanvas | ADR-0005 |

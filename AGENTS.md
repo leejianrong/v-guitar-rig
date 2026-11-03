@@ -16,6 +16,9 @@ Trust the code over the docs where they disagree, and fix the docs in the same P
 
 ## Constraints that aren't visible in one file
 
+- `Chain` (`packages/dsp-host/src/chain.ts`) is the one board engine; the worklet and `renderBoard` both run it. Never fork the processing path (parity is tested). A new pedal is a `ModuleDef` in `starter.ts`/`modules.ts` (param specs, `create`), plus an enamel colour in `apps/web/src/ui/finish.ts`.
+- UI work follows the `frontend-design` skill; keep the visual language (enamel pedals, jacks, amber signal). `@fontsource` imports have no `.css` suffix (package exports map).
+
 - `crates/rig-core` must stay free of browser/OS calls (ADR-0001): the same code runs in an AudioWorklet and in Node.
 - AudioWorklet scope has no `TextEncoder`, `performance` or DOM. Anything imported by `apps/web/src/worklet.ts` (including `packages/dsp-host`) must avoid them.
 - The daemon is the only writer of board files (ADR-0002); boards carry `rev` and stale writes get 409/exit 3. Keep `127.0.0.1` binding and the Host check: compose publishes loopback only.

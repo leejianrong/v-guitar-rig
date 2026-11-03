@@ -23,3 +23,16 @@ export function knobToValue(spec: ParamSpec, position: number): number {
       return spec.min + p * p * (spec.max - spec.min);
   }
 }
+
+/** Inverse of `knobToValue`: where a real value sits on the knob (0..1). */
+export function valueToKnob(spec: ParamSpec, value: number): number {
+  const v = Math.min(spec.max, Math.max(spec.min, value));
+  switch (spec.taper) {
+    case "linear":
+      return (v - spec.min) / (spec.max - spec.min);
+    case "log":
+      return Math.log(v / spec.min) / Math.log(spec.max / spec.min);
+    case "audio":
+      return Math.sqrt((v - spec.min) / (spec.max - spec.min));
+  }
+}

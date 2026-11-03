@@ -119,6 +119,23 @@ describe("boards", () => {
   });
 });
 
+describe("live updates", () => {
+  it("streams an accepted board write to subscribers", async () => {
+    const res = await api("/api/events");
+    const reader = (res.body as ReadableStream<Uint8Array>).getReader();
+    const b = (await (await api("/api/boards/default")).json()) as Board;
+    await api("/api/boards/default", {
+      method: "PUT",
+      body: JSON.stringify({ expectedRev: b.rev, board: { ...b, name: "streamed" } }),
+    });
+    let text = "";
+    while (!text.includes("streamed"))
+      text += new TextDecoder().decode((await reader.read()).value);
+    await reader.cancel();
+    expect(text).toContain('"name":"streamed"');
+  });
+});
+
 describe("render", () => {
   it("renders the default board through the API", async () => {
     const r = (await (

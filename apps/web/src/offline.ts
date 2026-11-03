@@ -1,3 +1,4 @@
+import type { Slot } from "@rig/shared";
 import workletUrl from "./worklet.ts?worker&url";
 
 /**
@@ -6,8 +7,7 @@ import workletUrl from "./worklet.ts?worker&url";
  */
 export async function renderOffline(
   wasm: WebAssembly.Module,
-  netlist: string,
-  oversample: number,
+  slots: Slot[],
   clip: Float32Array<ArrayBuffer>,
 ): Promise<Float32Array> {
   const ctx = new OfflineAudioContext(2, clip.length, 48000);
@@ -16,13 +16,10 @@ export async function renderOffline(
     numberOfInputs: 1,
     outputChannelCount: [2],
   });
-  const ready = new Promise<void>((resolve, reject) => {
-    node.port.onmessage = (e) => {
-      if (e.data.type === "ready") resolve();
-      else if (e.data.type === "error") reject(new Error(e.data.message));
-    };
+  const ready = new Promise<void>((resolve) => {
+    node.port.onmessage = (e) => e.data.type === "ready" && resolve();
   });
-  node.port.postMessage({ type: "init", module: wasm, netlist, oversample });
+  node.port.postMessage({ type: "init", module: wasm, slots });
   await ready;
   const buf = ctx.createBuffer(1, clip.length, 48000);
   buf.copyToChannel(clip, 0);

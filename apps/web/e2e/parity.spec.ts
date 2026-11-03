@@ -24,7 +24,10 @@ test("browser worklet output matches Node render within 1e-5 on a 5 s clip", asy
   const node = renderBoard(wasm, board, clip);
 
   await page.goto("/");
-  const browser = await page.evaluate((c) => window.__rigOffline?.(c), Array.from(clip));
+  const browser = await page.evaluate(([c, slots]) => window.__rigOffline?.(c, slots), [
+    Array.from(clip),
+    board.slots,
+  ] as const);
   expect(browser?.length).toBe(node.length);
 
   let maxDiff = 0;

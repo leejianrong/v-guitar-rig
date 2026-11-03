@@ -146,10 +146,16 @@ export async function runCli(argv: string[], io: Io): Promise<number> {
       const headers = { authorization: `Bearer ${token}`, "content-type": "application/json" };
       let res: Response;
       if (sub === "get") {
-        if (!pos[2]) return io.err("rig board get needs a board id\n"), EXIT.validation;
+        if (!pos[2]) {
+          io.err("rig board get needs a board id\n");
+          return EXIT.validation;
+        }
         res = await fetch(`${base}/api/boards/${pos[2]}`, { headers });
       } else {
-        if (!pos[2]) return io.err("rig board set needs a board file\n"), EXIT.validation;
+        if (!pos[2]) {
+          io.err("rig board set needs a board file\n");
+          return EXIT.validation;
+        }
         const board = JSON.parse(readFileSync(resolve(io.cwd, pos[2]), "utf8")) as Board;
         const expectedRev =
           str("expected-rev") !== undefined ? Number(str("expected-rev")) : board.rev;
