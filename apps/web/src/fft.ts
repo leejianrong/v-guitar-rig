@@ -40,3 +40,12 @@ export function powerDb(frame: Float32Array): Float32Array {
   }
   return out;
 }
+
+/** Strongest level in dB within 2% of `freq`, from a `powerDb` result. */
+export function levelNear(db: Float32Array, sampleRate: number, freq: number): number {
+  const hz = sampleRate / (db.length * 2);
+  let best = -200;
+  for (let f = freq * 0.98; f <= freq * 1.02; f += hz)
+    best = Math.max(best, db[Math.round(f / hz)] ?? -200);
+  return best;
+}

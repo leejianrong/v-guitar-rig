@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { Rig } from "../audio";
-import { powerDb } from "../fft";
+import { levelNear, powerDb } from "../fft";
 
 const F_MIN = 40;
 const F_MAX = 16000;
@@ -12,15 +12,8 @@ export const latest: { db: Float32Array | null; sampleRate: number } = {
   sampleRate: 48000,
 };
 
-export function levelAt(freq: number): number {
-  const { db, sampleRate } = latest;
-  if (!db) return -200;
-  const hz = sampleRate / (db.length * 2);
-  let best = -200;
-  for (let f = freq * 0.98; f <= freq * 1.02; f += hz)
-    best = Math.max(best, db[Math.round(f / hz)] ?? -200);
-  return best;
-}
+export const levelAt = (freq: number) =>
+  latest.db ? levelNear(latest.db, latest.sampleRate, freq) : -200;
 
 /** Warm sequential ramp: dark → ember → amber → paper. */
 function heat(db: number): string {

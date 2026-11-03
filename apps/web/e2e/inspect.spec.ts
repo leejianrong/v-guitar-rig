@@ -29,3 +29,29 @@ test("inspector receives the selected pedal's input and output, wherever it sits
     })
     .toBeLessThan(0.01);
 });
+
+test("before/after spectrum shows what the clipper adds, and follows the Level knob", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Start audio" }).click();
+  await page.waitForFunction(() => window.__rig?.ready === true, undefined, { timeout: 30_000 });
+  await page.getByTestId("pedal-diode-clipper@1").getByRole("heading").click();
+
+  const third = () => page.evaluate(() => window.__rig?.pair(330));
+  await expect.poll(async () => (await third())?.afterDb).toBeGreaterThan(-30);
+  const both = await third(); // the tone has no 3rd harmonic going in; the clipper makes one
+  expect((both?.afterDb ?? 0) - (both?.beforeDb ?? 0)).toBeGreaterThan(30);
+
+  await page
+    .getByRole("region", { name: "Pedal inspector" })
+    .screenshot({ path: "test-results/inspector.png" });
+
+  // turning Level to zero silences the output trace while the input trace stays
+  await page.getByTestId("pedal-diode-clipper@1").getByRole("slider", { name: "Level" }).focus();
+  await page.keyboard.press("Home");
+  await expect.poll(async () => (await third())?.afterDb).toBeLessThan(-80);
+  expect((await third())?.before).toBeGreaterThan(0.5);
+
+  await expect(page.getByLabel("Spectrum before and after")).toBeVisible();
+});
