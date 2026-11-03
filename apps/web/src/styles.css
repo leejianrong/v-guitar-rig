@@ -198,6 +198,10 @@ select {
   gap: 12px;
   transition: filter 120ms;
 }
+.pedal.selected {
+  outline: 2px solid var(--signal);
+  outline-offset: 4px;
+}
 .pedal.off {
   filter: saturate(0.45) brightness(0.8);
 }

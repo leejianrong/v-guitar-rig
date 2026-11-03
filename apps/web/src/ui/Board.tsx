@@ -8,6 +8,8 @@ interface Props {
   slots: Slot[];
   faults: Fault[];
   tap: number;
+  selected: string | null;
+  onSelect: (id: string | null) => void;
   onTap: (i: number) => void;
   edit: (fn: (s: Slot[]) => Slot[]) => void;
 }
@@ -55,10 +57,15 @@ function Jack({
   );
 }
 
-export function Board({ slots, faults, tap, onTap, edit }: Props) {
+export function Board({ slots, faults, tap, selected, onSelect, onTap, edit }: Props) {
   const dragFrom = useRef<number | null>(null);
   return (
-    <section className="board" aria-label="Pedalboard">
+    // biome-ignore lint/a11y/useKeyWithClickEvents: mouse shortcut; the Inspect button is the keyboard route
+    <section
+      className="board"
+      aria-label="Pedalboard"
+      onClick={(e) => e.target === e.currentTarget && onSelect(null)}
+    >
       <Jack index={0} slots={slots} tap={tap} onTap={onTap} />
       {slots.map((slot, i) => {
         const def = MODULES[slot.module];
@@ -77,9 +84,14 @@ export function Board({ slots, faults, tap, onTap, edit }: Props) {
               onBypass={() =>
                 edit((s) => s.map((x) => (x.id === slot.id ? { ...x, bypass: !x.bypass } : x)))
               }
-              onRemove={() => edit((s) => s.filter((x) => x.id !== slot.id))}
+              onRemove={() => {
+                if (selected === slot.id) onSelect(null);
+                edit((s) => s.filter((x) => x.id !== slot.id));
+              }}
               onMove={(d) => edit((s) => move(s, i, i + d))}
               canMove={[i > 0, i < slots.length - 1]}
+              selected={selected === slot.id}
+              onSelect={() => onSelect(slot.id)}
               drag={{
                 start: () => {
                   dragFrom.current = i;

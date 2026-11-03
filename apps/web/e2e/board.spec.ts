@@ -37,3 +37,33 @@ test("edit a pedalboard and pick a signal tap", async ({ page }) => {
   await page.getByRole("button", { name: "Remove Overdrive" }).click();
   expect(await order()).toEqual(["pedal-diode-clipper@1"]);
 });
+
+test("click a pedal to inspect it; knobs and the footswitch do not change the selection", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Add Fuzz to the board" }).click();
+  const clipper = page.getByTestId("pedal-diode-clipper@1");
+  const fuzz = page.getByTestId("pedal-fuzz@1");
+  const panel = page.getByRole("region", { name: "Pedal inspector" });
+  await expect(panel).toHaveCount(0);
+
+  await clipper.getByRole("heading").click();
+  await expect(panel).toContainText("Diode Clipper");
+  await expect(clipper).toHaveClass(/selected/);
+
+  await fuzz.getByRole("slider").first().click();
+  await fuzz.getByRole("button", { name: /^Fuzz on/ }).click();
+  await expect(panel).toContainText("Diode Clipper"); // unchanged
+
+  await fuzz.getByRole("button", { name: "Inspect Fuzz" }).click(); // keyboard route
+  await expect(panel).toContainText("Fuzz");
+  await expect(clipper).not.toHaveClass(/selected/);
+
+  await page.getByRole("region", { name: "Pedalboard" }).click({ position: { x: 4, y: 4 } });
+  await expect(panel).toHaveCount(0);
+
+  await fuzz.getByRole("heading").click();
+  await page.getByRole("button", { name: "Remove Fuzz" }).click();
+  await expect(panel).toHaveCount(0);
+});
