@@ -17,6 +17,7 @@ Trust the code over the docs where they disagree, and fix the docs in the same P
 ## Constraints that aren't visible in one file
 
 - `Chain` (`packages/dsp-host/src/chain.ts`) is the one board engine; the worklet and `renderBoard` both run it. Never fork the processing path (parity is tested). A new pedal is a `ModuleDef` in `starter.ts`/`modules.ts` (param specs, `create`), plus an enamel colour in `apps/web/src/ui/finish.ts`.
+- Every UI change is driven in a real browser with Playwright (`apps/web/e2e`) before it is called done: drag, wheel, click, and a screenshot look.
 - UI work follows the `frontend-design` skill; keep the visual language (enamel pedals, jacks, amber signal). `@fontsource` imports have no `.css` suffix (package exports map).
 
 - `crates/rig-core` must stay free of browser/OS calls (ADR-0001): the same code runs in an AudioWorklet and in Node.

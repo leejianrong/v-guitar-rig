@@ -84,7 +84,6 @@ export function Board({ slots, faults, tap, onTap, edit }: Props) {
                 start: () => {
                   dragFrom.current = i;
                 },
-                over: () => {},
                 drop: () => {
                   const from = dragFrom.current;
                   dragFrom.current = null;
@@ -97,7 +96,7 @@ export function Board({ slots, faults, tap, onTap, edit }: Props) {
         );
       })}
       {slots.length === 0 && (
-        <p className="empty">No pedals on the board. Add one from the shelf below.</p>
+        <p className="empty">No pedals on the board. Add one from the shelf on the left.</p>
       )}
     </section>
   );
