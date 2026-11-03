@@ -8,12 +8,9 @@ Plug in your guitar, play through virtual pedals and amps in the browser, and wa
 
 ```mermaid
 flowchart LR
-  G[Guitar / DI] --> W[AudioWorklet]
-  subgraph W[AudioWorklet in your browser]
-    C[Rust DSP core as WASM]
-  end
-  W --> O[Speakers]
-  W -.taps.-> V[Waveform + spectrogram]
+  G[Guitar or DI file] --> A[AudioWorklet<br/>Rust DSP core as WASM]
+  A --> S[Speakers]
+  A -.taps.-> V[Waveform and spectrogram]
 ```
 
 ## Quick start
