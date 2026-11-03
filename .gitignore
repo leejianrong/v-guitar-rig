@@ -9,3 +9,4 @@ dist/
 .claude/settings.local.json
 test-results/
 playwright-report/
+/rig/

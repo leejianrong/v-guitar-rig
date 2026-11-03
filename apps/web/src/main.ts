@@ -1,5 +1,7 @@
-import { DIODE_CLIPPER, RigCircuit } from "@rig/dsp-host";
+import { DIODE_CLIPPER, MODULES, RigCircuit } from "@rig/dsp-host";
+import type { Board } from "@rig/shared";
 import wasmUrl from "../../../target/wasm32-unknown-unknown/release/rig_core.wasm?url";
+import { renderOffline } from "./offline";
 import { draw, levelAt, makeTap, type Tap } from "./viz";
 import workletUrl from "./worklet.ts?worker&url";
 
@@ -16,6 +18,35 @@ let bypass = false;
 let wasmModule: WebAssembly.Module | null = null;
 let level: GainNode | null = null;
 let source: AudioNode | null = null;
+let activeNetlist = DIODE_CLIPPER;
+let activeOversample = 4;
+
+/** When served by the rig daemon the page carries a session token; use it to load the board. */
+async function connectDaemon(): Promise<void> {
+  const token = document.querySelector<HTMLMetaElement>('meta[name="rig-token"]')?.content;
+  if (!token) {
+    $("daemon").textContent = "standalone (no daemon): using the built-in diode clipper";
+    return;
+  }
+  try {
+    const res = await fetch("/api/boards/default", {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const board = (await res.json()) as Board;
+    const slot = board.slots.find((s) => !s.bypass && MODULES[s.module]);
+    const def = slot ? MODULES[slot.module] : undefined;
+    if (def) {
+      activeNetlist = def.netlist;
+      activeOversample = def.oversample;
+    }
+    $("daemon").textContent =
+      `connected: board "${board.name}" rev ${board.rev}, ${board.slots.length} slot(s)`;
+  } catch (err) {
+    $("daemon").textContent =
+      `daemon unreachable: ${err instanceof Error ? err.message : String(err)}`;
+  }
+}
 
 async function loadWasm(): Promise<WebAssembly.Module> {
   if (!wasmModule) wasmModule = await WebAssembly.compileStreaming(fetch(wasmUrl));
@@ -63,8 +94,8 @@ async function start() {
     node.port.postMessage({
       type: "init",
       module: await loadWasm(),
-      netlist: DIODE_CLIPPER,
-      oversample: 4,
+      netlist: activeNetlist,
+      oversample: activeOversample,
     });
     await ready;
 
@@ -153,6 +184,12 @@ function showProbe(data: Float32Array, sr: number) {
   $("loop").textContent = `${((lag / sr) * 1000).toFixed(1)} ms (${lag} frames at ${sr} Hz)`;
 }
 
+void connectDaemon();
+window.__rigOffline = async (clip: number[]) =>
+  Array.from(
+    await renderOffline(await loadWasm(), activeNetlist, activeOversample, Float32Array.from(clip)),
+  );
+
 $("start").addEventListener("click", start);
 $("pedal").addEventListener("click", () => {
   bypass = !bypass;
@@ -170,6 +207,7 @@ $("level").addEventListener("input", (e) => {
 
 declare global {
   interface Window {
+    __rigOffline?: (clip: number[]) => Promise<number[]>;
     __rig?: {
       ready: boolean;
       sampleRate: number;

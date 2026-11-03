@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install check lint typecheck test test-unit test-integration test-e2e wasm hooks
+.PHONY: help install check lint typecheck test test-unit test-integration test-e2e test-compose up wasm hooks
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -25,8 +25,15 @@ test-unit: ## No-infra tests (Rust + TS)
 test-integration: wasm ## Integration tests: WASM core in Node (daemon/parity tests join in V2)
 	pnpm -r --if-present test:int
 
-test-e2e: wasm ## Headless Chromium against a test-tone DI (needs: pnpm exec playwright install chromium)
+test-e2e: wasm ## Headless Chromium: live clipper + browser/Node parity (needs: pnpm --filter @rig/web exec playwright install chromium)
 	pnpm --filter @rig/web test:e2e
+
+test-compose: ## Boot the real docker compose stack and check auth, loopback binding and the UI
+	scripts/compose-smoke.sh
+
+up: ## Start the daemon and UI with docker compose (rig files in ./rig)
+	mkdir -p rig
+	RIG_UID=$$(id -u) RIG_GID=$$(id -g) docker compose up --build
 
 wasm: ## Build the DSP core to WASM
 	cargo build -p rig-core --target wasm32-unknown-unknown --release
