@@ -27,6 +27,13 @@ export async function benchmarkHeadroom(): Promise<number> {
   return ((BLOCK / 48000) * 1000) / ((performance.now() - t0) / blocks);
 }
 
+/** The signal going into and coming out of one pedal over the same stretch of time. */
+export interface Pair {
+  slot: number;
+  before: Float32Array;
+  after: Float32Array;
+}
+
 export interface ProbeResult {
   /** Round trip in ms, or null if no click came back. */
   ms: number | null;
@@ -38,6 +45,7 @@ export class Rig {
   readonly latencyMs: number;
   private readonly ctx: AudioContext;
   private tapListeners = new Set<(frame: Float32Array) => void>();
+  private pairListeners = new Set<(p: Pair) => void>();
   private faultListeners = new Set<(f: Fault[]) => void>();
   private probeListeners = new Set<(r: ProbeResult) => void>();
 
@@ -54,6 +62,7 @@ export class Rig {
     node.port.onmessage = (e) => {
       const m = e.data;
       if (m.type === "tap") for (const l of this.tapListeners) l(m.frame);
+      else if (m.type === "pair") for (const l of this.pairListeners) l(m);
       else if (m.type === "faults") for (const l of this.faultListeners) l(m.faults);
       else if (m.type === "probe-result") {
         const d = m.data as Float32Array;
@@ -127,6 +136,14 @@ export class Rig {
   }
   selectTap(index: number) {
     this.node.port.postMessage({ type: "tap", index });
+  }
+  /** Send the input and output of the pedal at `slot` (index in the board), or stop with -1. */
+  inspect(slot: number) {
+    this.node.port.postMessage({ type: "inspect", slot });
+  }
+  onPair(l: (p: Pair) => void) {
+    this.pairListeners.add(l);
+    return () => void this.pairListeners.delete(l);
   }
   setLevel(v: number) {
     this.level.gain.value = v;

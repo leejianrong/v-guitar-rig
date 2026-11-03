@@ -1,5 +1,5 @@
 /// <reference path="./worklet-env.d.ts" />
-import { BLOCK, Chain, type Fault } from "@rig/dsp-host";
+import { BLOCK, Chain, type Fault, Framer } from "@rig/dsp-host";
 import type { Slot } from "@rig/shared";
 
 const PROBE_FRAMES = 48000; // record one second after the click
@@ -9,6 +9,7 @@ type InMsg =
   | { type: "init"; module: WebAssembly.Module; slots: Slot[] }
   | { type: "slots"; slots: Slot[] }
   | { type: "tap"; index: number }
+  | { type: "inspect"; slot: number }
   | { type: "probe" };
 
 class RigProcessor extends AudioWorkletProcessor {
@@ -16,8 +17,10 @@ class RigProcessor extends AudioWorkletProcessor {
   private readonly tmpIn = new Float32Array(BLOCK);
   private readonly tmpOut = new Float32Array(BLOCK);
   private tapIndex = -1; // -1 means the chain output
-  private tapBuf = new Float32Array(TAP_FRAME);
-  private tapPos = 0;
+  private tapFrames = new Framer(TAP_FRAME);
+  private inspectSlot = -1; // slot whose input and output go to the inspector, or -1
+  private inFrames = new Framer(TAP_FRAME);
+  private outFrames = new Framer(TAP_FRAME);
   private faultsSent = 0;
   private probeLeft = 0;
   private probeRec = new Float32Array(PROBE_FRAMES);
@@ -34,7 +37,11 @@ class RigProcessor extends AudioWorkletProcessor {
       } else if (m.type === "slots") this.chain?.setSlots(m.slots);
       else if (m.type === "tap") {
         this.tapIndex = m.index;
-        this.tapPos = 0;
+        this.tapFrames.reset();
+      } else if (m.type === "inspect") {
+        this.inspectSlot = m.slot;
+        this.inFrames.reset();
+        this.outFrames.reset();
       } else if (m.type === "probe") {
         this.probeLeft = PROBE_FRAMES;
         this.probePos = 0;
@@ -75,15 +82,15 @@ class RigProcessor extends AudioWorkletProcessor {
       chain.taps[
         this.tapIndex < 0 ? chain.taps.length - 1 : Math.min(this.tapIndex, chain.taps.length - 1)
       ];
-    if (tap) {
-      this.tapBuf.set(tap, this.tapPos);
-      this.tapPos += BLOCK;
-      if (this.tapPos >= TAP_FRAME) {
-        const frame = this.tapBuf;
-        this.tapBuf = new Float32Array(TAP_FRAME);
-        this.tapPos = 0;
-        this.port.postMessage({ type: "tap", frame }, [frame.buffer]);
-      }
+    const frame = tap && this.tapFrames.push(tap);
+    if (frame) this.port.postMessage({ type: "tap", frame }, [frame.buffer]);
+
+    const k = this.inspectSlot;
+    const [before, after] = [chain.taps[k], chain.taps[k + 1]];
+    if (k >= 0 && before && after) {
+      const [a, b] = [this.inFrames.push(before), this.outFrames.push(after)];
+      if (a && b)
+        this.port.postMessage({ type: "pair", slot: k, before: a, after: b }, [a.buffer, b.buffer]);
     }
     if (chain.faults.length !== this.faultsSent) {
       this.faultsSent = chain.faults.length;

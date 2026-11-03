@@ -4,7 +4,7 @@ import { benchmarkHeadroom, loadWasm, Rig, type Source } from "./audio";
 import { useBoard } from "./board-state";
 import { renderOffline } from "./offline";
 import { Board, tapLabel } from "./ui/Board";
-import { Inspector } from "./ui/Inspector";
+import { Inspector, pairLevels } from "./ui/Inspector";
 import { Library } from "./ui/Library";
 import { levelAt, Scope } from "./ui/Scope";
 
@@ -26,6 +26,8 @@ export function App() {
 
   useEffect(() => rig?.setSlots(slots), [rig, slots]);
   useEffect(() => rig?.selectTap(tapAt), [rig, tapAt]);
+  const inspected = slots.findIndex((s) => s.id === selectedId);
+  useEffect(() => rig?.inspect(inspected), [rig, inspected]);
   useEffect(() => rig?.setLevel(level), [rig, level]);
   useEffect(() => rig?.setVolume(volume), [rig, volume]);
   useEffect(() => {
@@ -56,7 +58,7 @@ export function App() {
       setStatus("Running");
       const h = await benchmarkHeadroom();
       setHeadroom(h);
-      window.__rig = { ready: true, headroom: h, level: levelAt };
+      window.__rig = { ready: true, headroom: h, level: levelAt, pair: pairLevels };
     } catch (e) {
       setStatus(`Could not start: ${e instanceof Error ? e.message : String(e)}`);
     }
@@ -144,7 +146,7 @@ export function App() {
             onTap={setTap}
             edit={edit}
           />
-          {selectedDef && <Inspector def={selectedDef} />}
+          {selectedDef && <Inspector def={selectedDef} rig={rig} />}
           <Scope rig={rig} label={tapLabel(slots, tapAt)} />
         </div>
       </div>
@@ -186,6 +188,11 @@ export function App() {
 declare global {
   interface Window {
     __rigOffline?: (clip: number[], slots: import("@rig/shared").Slot[]) => Promise<number[]>;
-    __rig?: { ready: boolean; headroom: number; level: (freq: number) => number };
+    __rig?: {
+      ready: boolean;
+      headroom: number;
+      level: (freq: number) => number;
+      pair: typeof pairLevels;
+    };
   }
 }
