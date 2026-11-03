@@ -20,9 +20,8 @@ You need Node 24+, [pnpm](https://pnpm.io), and [Rust via rustup](https://rustup
 ```bash
 git clone https://github.com/leejianrong/v-guitar-rig.git
 cd v-guitar-rig
-make install                  # JS deps and the pinned Rust toolchain
-make wasm                     # build the DSP core
-pnpm --filter @rig/web dev    # open http://127.0.0.1:5173
+make install   # JS deps and the pinned Rust toolchain
+make demo      # builds everything, serves the UI and daemon, prints the URL
 ```
 
 Use Chrome or another Chromium browser.
