@@ -21,7 +21,8 @@ export function App() {
   const [loop, setLoop] = useState("not measured (needs a cable from interface output to input)");
   const [selectedId, select] = useState<string | null>(null);
   const slots = board.slots;
-  const selectedDef = MODULES[slots.find((s) => s.id === selectedId)?.module ?? ""];
+  const selectedSlot = slots.find((s) => s.id === selectedId);
+  const selectedDef = MODULES[selectedSlot?.module ?? ""];
   const tapAt = Math.min(tap, slots.length);
 
   useEffect(() => rig?.setSlots(slots), [rig, slots]);
@@ -146,7 +147,9 @@ export function App() {
             onTap={setTap}
             edit={edit}
           />
-          {selectedDef && <Inspector def={selectedDef} rig={rig} />}
+          {selectedDef && selectedSlot && (
+            <Inspector def={selectedDef} slot={selectedSlot} rig={rig} />
+          )}
           <Scope rig={rig} label={tapLabel(slots, tapAt)} />
         </div>
       </div>

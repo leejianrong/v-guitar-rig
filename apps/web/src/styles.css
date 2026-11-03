@@ -540,3 +540,6 @@ select {
   background: var(--signal);
   margin-left: 10px;
 }
+.inspector canvas.curve {
+  width: min(100%, 320px);
+}

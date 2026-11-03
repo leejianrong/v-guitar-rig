@@ -77,3 +77,32 @@ test("level view: turning a pedal up shows as gain, and bypassing it makes in an
     /^[+-]0\.\d dB$/,
   );
 });
+
+test("transfer curve is measured without audio running and follows the fuzz knob", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Add Fuzz to the board" }).click();
+  const fuzz = page.getByTestId("pedal-fuzz@1");
+  await fuzz.getByRole("heading").click();
+
+  const summary = page.getByTestId("curve-summary");
+  const quiet = async () => {
+    const m = /quiet notes ([+-][\d.]+) dB/.exec((await summary.textContent()) ?? "");
+    return Number(m?.[1] ?? Number.NaN);
+  };
+  await expect(summary).toContainText("quiet notes");
+  const before = await quiet();
+  // default fuzz 30x, level 0.4; the negative half swings 1.6 x 0.8 = 1.28x harder, and the peak is the larger
+  const small = (fuzz: number) => 20 * Math.log10(fuzz * 0.4 * 1.28);
+  expect(before).toBeCloseTo(small(30), 0);
+
+  await fuzz.getByRole("slider", { name: "Fuzz" }).focus();
+  await page.keyboard.press("End"); // 100x
+  await expect.poll(quiet).toBeGreaterThan(before + 6);
+  await expect.poll(quiet).toBeCloseTo(small(100), 0);
+
+  await page.getByLabel("Transfer curve: level out against level in").screenshot({
+    path: "test-results/curve.png",
+  });
+});
