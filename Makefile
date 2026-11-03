@@ -22,8 +22,8 @@ test-unit: ## No-infra tests (Rust + TS)
 	cargo test --workspace
 	pnpm test
 
-test-integration: ## Daemon/CLI/MCP and parity tests (V2+; needs Node, no Docker yet)
-	@echo "no integration tests yet (arrive with V2)"
+test-integration: wasm ## Integration tests: WASM core in Node (daemon/parity tests join in V2)
+	pnpm -r --if-present test:int
 
 test-e2e: ## Headless Chromium against a looped DI file (V1+)
 	@echo "no e2e tests yet (arrive with V1)"
