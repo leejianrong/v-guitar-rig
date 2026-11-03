@@ -109,10 +109,14 @@ Vertical increments. Each ends in something you can demonstrate. Slice 1 confron
 
 **Build plan**
 
-1. Analysis tap ring buffer to the main thread; FFT and spectrogram renderer on OffscreenCanvas.
-2. Transfer-curve probe, impulse and frequency response measurement on a module copy.
-3. Before/after spectrum, envelope follower, declared-descriptor widgets (delay taps, LFO).
-4. Frame-budget instrumentation.
+Stories are on Pandan board VGR, epic VGR-E4 (25 points).
+
+1. Selecting a pedal opens a detail panel (VGR-1).
+2. The worklet streams the selected pedal's input and output taps as a pair, through the existing tap path (VGR-2).
+3. Before/after spectrum, then envelope follower (VGR-3, VGR-4).
+4. Transfer curve and frequency response, measured on a throwaway module copy on the main thread so live audio cannot be disturbed (VGR-5, VGR-6).
+5. Declared descriptors drawn by the host: delay taps, chorus LFO (VGR-7).
+6. Frame and underrun counters plus a 60 s soak; canvases move to OffscreenCanvas only if the budget is missed (VGR-8).
 
 **Demo:** Select a fuzz pedal and see its measured transfer curve and before/after spectrum update live as you turn the gain knob; select the delay and see its tap times drawn.
 
