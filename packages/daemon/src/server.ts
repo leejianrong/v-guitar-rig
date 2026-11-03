@@ -74,6 +74,11 @@ export async function startServer(opts: ServeOptions): Promise<Running> {
   mkdirSync(join(opts.rigDir, ".rig"), { recursive: true });
   writeFileSync(join(opts.rigDir, ".rig", "token"), token, { mode: 0o600 });
 
+  const watchers = new Set<ServerResponse>();
+  const broadcast = (board: unknown) => {
+    for (const w of watchers) w.write(`data: ${JSON.stringify(board)}\n\n`);
+  };
+
   const server = createServer(async (req, res) => {
     try {
       if (!hostOk(req.headers.host)) return send(res, 403, { error: "bad_host" });
@@ -95,6 +100,18 @@ export async function startServer(opts: ServeOptions): Promise<Running> {
     if (method === "GET" && parts[1] === "health" && parts.length === 2) {
       return send(res, 200, { ok: true, boards: store.listBoards().length });
     }
+    if (method === "GET" && parts[1] === "events" && parts.length === 2) {
+      // Server-sent events: the UI hears about every accepted board write, including the agent's.
+      res.writeHead(200, {
+        "content-type": "text/event-stream",
+        "cache-control": "no-store",
+        connection: "keep-alive",
+      });
+      res.write(": connected\n\n");
+      watchers.add(res);
+      req.on("close", () => watchers.delete(res));
+      return;
+    }
     if (parts[1] === "boards" && parts.length === 2 && method === "GET") {
       return send(res, 200, { boards: store.listBoards() });
     }
@@ -110,7 +127,10 @@ export async function startServer(opts: ServeOptions): Promise<Running> {
           return send(res, 422, { error: "invalid", errors: ["`expectedRev` must be an integer"] });
         }
         const r = store.putBoard(id, body.board, body.expectedRev as number);
-        if (r.ok) return send(res, 200, r.board);
+        if (r.ok) {
+          broadcast(r.board);
+          return send(res, 200, r.board);
+        }
         if (r.kind === "stale") return send(res, 409, { error: "stale_rev", current: r.current });
         return send(res, 422, { error: "invalid", errors: r.errors });
       }
@@ -185,6 +205,10 @@ export async function startServer(opts: ServeOptions): Promise<Running> {
     server,
     token,
     url: `http://127.0.0.1:${addr.port}`,
-    close: () => new Promise((resolve) => server.close(() => resolve())),
+    close: () =>
+      new Promise((resolve) => {
+        for (const w of watchers) w.end();
+        server.close(() => resolve());
+      }),
   };
 }

@@ -43,7 +43,7 @@ Vertical increments. Each ends in something you can demonstrate. Slice 1 confron
 
 **Build plan**
 
-1. Node daemon with HTTP/WS API, token auth, 127.0.0.1 bind; docker compose file serving UI and API.
+1. Node daemon with an HTTP API (live board changes arrive over server-sent events in V3), token auth, 127.0.0.1 bind; docker compose file serving UI and API.
 2. Host the same WASM in Node; `rig render --board --input --out` plus `--json`.
 3. Parity harness comparing worklet output (captured in Chromium) to Node render.
 4. Rig directory with schema-versioned board file and watcher.
@@ -75,9 +75,10 @@ Vertical increments. Each ends in something you can demonstrate. Slice 1 confron
 **Build plan**
 
 1. Module registry and param schema for behavioral modules; loader in worklet and Node.
-2. Ship a starter set: overdrive, fuzz, delay, chorus, reverb, tuner-style bypass, noise gate.
-3. Library grid and board editor: add, reorder, bypass, knobs, with smoothing and 20 ms crossfade on swap.
-4. Per-slot taps feeding the signal view.
+2. Ship a starter set: overdrive, fuzz, delay, chorus, reverb, noise gate (plus the circuit-solved diode clipper).
+3. Shelf and board editor: add, remove, reorder (drag or buttons), bypass footswitch, rotary knobs; 10 ms parameter smoothing, and a 10 ms fade-out/fade-in (a duck, not a true crossfade) around any change of order, membership or bypass.
+4. Jacks between pedals pick the tap shown in the signal view (waveform and spectrogram).
+5. The daemon pushes accepted board writes to the UI over server-sent events, so agent edits appear live.
 
 **Demo:** Build a board of four pedals, reorder them while playing, and hear no clicks while the waveform and spectrogram follow each stage.
 
@@ -87,17 +88,20 @@ Vertical increments. Each ends in something you can demonstrate. Slice 1 confron
 
 #### End-to-end
 
-- Reordering two pedals while a looped DI plays produces no sample discontinuity above -40 dBFS at the swap.
-- Moving a knob updates the output within 50 ms and the UI knob reflects an agent-set value.
+- In Chromium, a board can be edited end to end: add, reorder, tune a knob by keyboard, reset it, bypass, pick a tap, remove.
+- Against the real docker stack, a pedal and knob value written by another client appear in the UI without a reload.
+- Browser worklet output still equals the Node render within 1e-5 with the shared `Chain` engine.
 
 #### Integration
 
-- Two concurrent board edits: the second with a stale rev is rejected, not lost.
+- Two concurrent board edits: the second with a stale rev is rejected, not lost; accepted writes are streamed to subscribers.
+- Reordering two pedals, or toggling bypass, mid-stream adds no step larger than 0.01 (-40 dBFS) over the unswapped baseline.
 
 #### Unit
 
 - Taper functions map 0..1 to the declared range monotonically.
-- Parameter smoothing reaches target within the declared time.
+- Parameter smoothing is within 1% of target after 50 ms; out-of-range values are clamped.
+- Every starter pedal stays finite and bounded on impulse, noise, full-scale square and DC; a module that throws or emits NaN is bypassed and reported.
 
 ## V4: Per-effect real-time visuals
 

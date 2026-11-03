@@ -4,57 +4,9 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Virtual Guitar Rig</title>
-    <style>
-      :root { color-scheme: dark; --bg:#12171a; --panel:#1a2125; --fg:#e6ebec; --muted:#9aa7ad; --line:#2f3a40; --accent:#f0a030; }
-      * { box-sizing: border-box; }
-      body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.5 system-ui, sans-serif; }
-      main { max-width: 960px; margin: 0 auto; padding: 20px 16px 48px; display:grid; gap:16px; }
-      h1 { font-size: 22px; margin:0; }
-      .row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
-      .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:12px; }
-      button, select, input { font:inherit; color:var(--fg); background:#232c31; border:1px solid var(--line); border-radius:6px; padding:6px 10px; }
-      button { cursor:pointer; } button.on { border-color:var(--accent); color:var(--accent); }
-      button:focus-visible, select:focus-visible, input:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-      .grid { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
-      @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
-      canvas { width:100%; height:auto; display:block; background:#0c1012; border-radius:4px; }
-      .label { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.06em; margin-bottom:6px; }
-      dl { display:grid; grid-template-columns:auto 1fr; gap:2px 14px; margin:0; }
-      dt { color:var(--muted); } dd { margin:0; font-variant-numeric: tabular-nums; }
-      #status { color:var(--muted); }
-    </style>
   </head>
   <body>
-    <main>
-      <h1>Virtual Guitar Rig <span style="color:var(--muted);font-weight:400">· V1 circuit pedal</span></h1>
-      <div class="panel row">
-        <label>Source
-          <select id="source">
-            <option value="tone">Test tone (110 Hz DI)</option>
-            <option value="guitar">Guitar input</option>
-          </select>
-        </label>
-        <label>Input level <input id="level" type="range" min="0" max="1" step="0.01" value="0.9" /></label>
-        <button id="start">Start audio</button>
-        <button id="pedal" class="on" disabled>Diode clipper: on</button>
-        <button id="probe" disabled>Measure loopback latency</button>
-        <span id="status">Idle</span>
-      </div>
-      <div class="grid">
-        <div class="panel"><div class="label">Input</div><canvas id="wave-in" width="480" height="120"></canvas><canvas id="spec-in" width="480" height="160"></canvas></div>
-        <div class="panel"><div class="label">Output</div><canvas id="wave-out" width="480" height="120"></canvas><canvas id="spec-out" width="480" height="160"></canvas></div>
-      </div>
-      <div class="panel">
-        <div class="label">Engine</div>
-        <dl>
-          <dt>Sample rate</dt><dd id="sr">-</dd>
-          <dt>Browser-reported latency</dt><dd id="lat">-</dd>
-          <dt>Loopback round trip</dt><dd id="loop">not measured (needs a cable from interface output to input)</dd>
-          <dt>CPU headroom (benchmark)</dt><dd id="head">-</dd>
-          <dt>Daemon</dt><dd id="daemon">checking...</dd>
-        </dl>
-      </div>
-    </main>
-    <script type="module" src="/src/main.ts"></script>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

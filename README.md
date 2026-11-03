@@ -2,9 +2,9 @@
 
 Plug in your guitar, play through virtual pedals and amps in the browser, and watch the signal change at every stage. Effects are modelled from real parts (diodes today; transistors, tubes and ICs next), and you can describe a tone to your own LLM through MCP or CLI to build it.
 
-![Diode clipper pedal: sine in, clipped waveform and added harmonics out](docs/img/screenshot.png)
+![Pedalboard with four pedals, jacks between them, and the waveform and spectrogram at the selected jack](docs/img/screenshot.png)
 
-> **Early stage.** One pedal works end to end: a diode clipper solved from its netlist in real time, with a daemon, a board file and an offline renderer behind it. The board editor, MCP and amp sims are planned; see [docs/SLICES.md](docs/SLICES.md).
+> **Early stage.** A diode clipper is solved from its netlist in real time, with a pedalboard editor, six more pedals, a daemon, board files and an offline renderer behind it. MCP and amp sims are planned; see [docs/SLICES.md](docs/SLICES.md).
 
 ```mermaid
 flowchart LR
@@ -36,8 +36,8 @@ Live audio always runs in your browser; Docker cannot reach a Windows sound card
 
 ## Usage
 
-1. Choose **Test tone** to hear the pedal with no hardware, or **Guitar input** to play through your audio interface, then press **Start audio**. Keep your volume low at first.
-2. Toggle **Diode clipper** to compare the clean and clipped signal, and watch the harmonics appear in the output spectrogram.
+1. Choose **Test tone** to hear the board with no hardware, or **Guitar input** to play through your audio interface, then press **Start audio**. Keep your volume low at first.
+2. Build a board: add pedals from the shelf, drag them (or use the arrows) to reorder, turn knobs by dragging, arrow keys or double-click to reset, and press a footswitch to bypass. Click a jack on a cable to see the waveform and spectrogram at that point in the chain.
 3. For offline rendering, build the CLI and render the default board through the same DSP core:
    ```bash
    pnpm --filter @rig/daemon build

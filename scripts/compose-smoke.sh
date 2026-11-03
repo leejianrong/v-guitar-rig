@@ -36,5 +36,5 @@ echo "ok: not reachable on ${lan_ip:-<no lan address>}"
 curl -sf "$base/" | grep -q 'name="rig-token"' || { echo "FAIL: UI not served with a session token"; exit 1; }
 echo "ok: UI served"
 
-RIG_URL="$base" pnpm --filter @rig/web exec playwright test daemon-ui
+RIG_URL="$base" RIG_TOKEN="$token" pnpm --filter @rig/web exec playwright test daemon-ui
 echo "compose smoke passed"

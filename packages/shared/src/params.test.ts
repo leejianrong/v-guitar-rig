@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { knobToValue, type ParamSpec } from "./params";
+import { knobToValue, type ParamSpec, valueToKnob } from "./params";
 
 const base: ParamSpec = {
   id: "gain",
@@ -31,5 +31,13 @@ describe("knobToValue", () => {
   it("clamps out-of-range positions", () => {
     expect(knobToValue(base, -3)).toBeCloseTo(base.min);
     expect(knobToValue(base, 7)).toBeCloseTo(base.max);
+  });
+});
+
+describe("valueToKnob", () => {
+  it.each(["linear", "log", "audio"] as const)("%s taper round-trips knobToValue", (taper) => {
+    const spec = { ...base, taper };
+    for (const p of [0, 0.1, 0.5, 0.9, 1])
+      expect(valueToKnob(spec, knobToValue(spec, p))).toBeCloseTo(p, 9);
   });
 });

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { type Board, testClip } from "@rig/shared";
 import { describe, expect, it } from "vitest";
+import { MODULES, type ModuleDef } from "./modules";
 import { ModuleError, renderBoard } from "./render";
 
 const wasm = new WebAssembly.Module(
@@ -32,7 +33,14 @@ describe("renderBoard", () => {
   });
 
   it("reports a broken module as ModuleError", () => {
-    const registry = { "diode-clipper@1": { netlist: "R r a b 1k", oversample: 4 } };
+    const registry = {
+      "diode-clipper@1": {
+        ...MODULES["diode-clipper@1"],
+        create: () => {
+          throw new Error("bad netlist");
+        },
+      },
+    } as unknown as Record<string, ModuleDef>;
     expect(() => renderBoard(wasm, board(false), testClip(256), 48000, registry)).toThrow(
       ModuleError,
     );
