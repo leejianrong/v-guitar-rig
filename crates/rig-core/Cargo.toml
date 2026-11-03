@@ -1,0 +1,9 @@
+[package]
+name = "rig-core"
+description = "Host-agnostic DSP core: circuit solver, oversampler, convolver. Compiles to WASM."
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]

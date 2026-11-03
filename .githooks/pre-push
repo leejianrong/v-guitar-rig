@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Fast gate only: never run slow checks here. Bypass once with `git push --no-verify`.
+set -euo pipefail
+exec make check
