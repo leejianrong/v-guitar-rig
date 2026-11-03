@@ -32,10 +32,11 @@ export interface ProbeResult {
   ms: number | null;
 }
 
-/** The live audio graph: source -> level -> worklet (the board) -> limiter -> speakers. */
+/** The live audio graph: source -> level -> worklet (the board) -> limiter -> volume -> speakers. */
 export class Rig {
   readonly sampleRate: number;
   readonly latencyMs: number;
+  private readonly ctx: AudioContext;
   private tapListeners = new Set<(frame: Float32Array) => void>();
   private faultListeners = new Set<(f: Fault[]) => void>();
   private probeListeners = new Set<(r: ProbeResult) => void>();
@@ -44,7 +45,10 @@ export class Rig {
     ctx: AudioContext,
     private readonly node: AudioWorkletNode,
     private readonly level: GainNode,
+    private readonly volume: GainNode,
+    private readonly stream: MediaStream | null,
   ) {
+    this.ctx = ctx;
     this.sampleRate = ctx.sampleRate;
     this.latencyMs = (ctx.baseLatency + (ctx.outputLatency || 0)) * 1000;
     node.port.onmessage = (e) => {
@@ -61,7 +65,7 @@ export class Rig {
     };
   }
 
-  static async start(source: Source, slots: Slot[], level: number): Promise<Rig> {
+  static async start(source: Source, slots: Slot[], level: number, volume: number): Promise<Rig> {
     const ctx = new AudioContext({ sampleRate: 48000, latencyHint: "interactive" });
     await ctx.audioWorklet.addModule(workletUrl);
     const node = new AudioWorkletNode(ctx, "rig-processor", {
@@ -77,9 +81,10 @@ export class Rig {
     const gain = ctx.createGain();
     gain.gain.value = level;
     let src: AudioNode;
+    let stream: MediaStream | null = null;
     if (source === "guitar") {
       // raw instrument signal: no echo cancellation, noise suppression or auto gain
-      const stream = await navigator.mediaDevices.getUserMedia({
+      stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: false,
           noiseSuppression: false,
@@ -102,9 +107,19 @@ export class Rig {
     limiter.knee.value = 0;
     limiter.ratio.value = 20;
     node.connect(limiter);
-    limiter.connect(ctx.destination);
+    // after the limiter, so the volume knob can only turn things down from the ceiling
+    const out = ctx.createGain();
+    out.gain.value = volume;
+    limiter.connect(out);
+    out.connect(ctx.destination);
     await ctx.resume();
-    return new Rig(ctx, node, gain);
+    return new Rig(ctx, node, gain, out, stream);
+  }
+
+  /** Silence everything and release the audio device and microphone. The Rig cannot be restarted. */
+  async stop() {
+    for (const t of this.stream?.getTracks() ?? []) t.stop();
+    await this.ctx.close();
   }
 
   setSlots(slots: Slot[]) {
@@ -115,6 +130,9 @@ export class Rig {
   }
   setLevel(v: number) {
     this.level.gain.value = v;
+  }
+  setVolume(v: number) {
+    this.volume.gain.value = v;
   }
   probe() {
     this.node.port.postMessage({ type: "probe" });

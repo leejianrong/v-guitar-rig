@@ -12,7 +12,7 @@ interface Props {
   onRemove: () => void;
   onMove: (dir: -1 | 1) => void;
   canMove: [boolean, boolean];
-  drag: { start: () => void; over: () => void; drop: () => void };
+  drag: { start: () => void; drop: () => void };
 }
 
 export function Pedal({
@@ -33,12 +33,7 @@ export function Pedal({
       className={`pedal${on ? "" : " off"}`}
       style={{ "--finish": finish, "--ink": ink } as React.CSSProperties}
       data-testid={`pedal-${def.id}`}
-      draggable
-      onDragStart={drag.start}
-      onDragOver={(e) => {
-        e.preventDefault();
-        drag.over();
-      }}
+      onDragOver={(e) => e.preventDefault()}
       onDrop={drag.drop}
     >
       <div className="pedal-tools">
@@ -62,7 +57,20 @@ export function Pedal({
           ▶
         </button>
       </div>
-      <h3 className="legend">{def.name}</h3>
+      {/* only the legend drags the pedal: a draggable ancestor would steal knob drags */}
+      <h3
+        className="legend"
+        title="Drag to reorder"
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.setData("text/plain", def.id);
+          const box = e.currentTarget.parentElement;
+          if (box) e.dataTransfer.setDragImage(box, 20, 20);
+          drag.start();
+        }}
+      >
+        {def.name}
+      </h3>
       <div className={`knobs k${def.params.length}`}>
         {def.params.map((p) => (
           <Knob

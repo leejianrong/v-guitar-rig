@@ -12,6 +12,7 @@ export function App() {
   const [rig, setRig] = useState<Rig | null>(null);
   const [source, setSource] = useState<Source>("tone");
   const [level, setLevel] = useState(0.9);
+  const [volume, setVolume] = useState(0.8);
   const [tap, setTap] = useState(1 << 20); // clamped below; starts at the output
   const [faults, setFaults] = useState<Fault[]>([]);
   const [status, setStatus] = useState("Idle");
@@ -23,6 +24,7 @@ export function App() {
   useEffect(() => rig?.setSlots(slots), [rig, slots]);
   useEffect(() => rig?.selectTap(tapAt), [rig, tapAt]);
   useEffect(() => rig?.setLevel(level), [rig, level]);
+  useEffect(() => rig?.setVolume(volume), [rig, volume]);
   useEffect(() => {
     if (!rig) return;
     const offs = [
@@ -46,7 +48,7 @@ export function App() {
   async function start() {
     setStatus("Starting audio...");
     try {
-      const r = await Rig.start(source, slots, level);
+      const r = await Rig.start(source, slots, level, volume);
       setRig(r);
       setStatus("Running");
       const h = await benchmarkHeadroom();
@@ -55,6 +57,14 @@ export function App() {
     } catch (e) {
       setStatus(`Could not start: ${e instanceof Error ? e.message : String(e)}`);
     }
+  }
+
+  async function stop() {
+    window.__rig = undefined;
+    setRig(null);
+    setFaults([]);
+    setStatus("Stopped");
+    await rig?.stop();
   }
 
   return (
@@ -83,9 +93,26 @@ export function App() {
             onChange={(e) => setLevel(Number(e.target.value))}
           />
         </label>
-        <button type="button" className="primary" disabled={!!rig} onClick={start}>
-          {rig ? "Audio running" : "Start audio"}
-        </button>
+        <label>
+          Output volume
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value={volume}
+            onChange={(e) => setVolume(Number(e.target.value))}
+          />
+        </label>
+        {rig ? (
+          <button type="button" onClick={stop}>
+            Stop audio
+          </button>
+        ) : (
+          <button type="button" className="primary" onClick={start}>
+            Start audio
+          </button>
+        )}
         <output className="status">{status}</output>
       </header>
 
@@ -98,14 +125,17 @@ export function App() {
         </output>
       )}
 
-      <Board slots={slots} faults={faults} tap={tapAt} onTap={setTap} edit={edit} />
-      <Scope rig={rig} label={tapLabel(slots, tapAt)} />
-
-      <Library
-        onAdd={(id) =>
-          edit((s) => [...s, { id: crypto.randomUUID(), module: id, bypass: false, params: {} }])
-        }
-      />
+      <div className="stage">
+        <Library
+          onAdd={(id) =>
+            edit((s) => [...s, { id: crypto.randomUUID(), module: id, bypass: false, params: {} }])
+          }
+        />
+        <div className="work">
+          <Board slots={slots} faults={faults} tap={tapAt} onTap={setTap} edit={edit} />
+          <Scope rig={rig} label={tapLabel(slots, tapAt)} />
+        </div>
+      </div>
       <footer className="engine">
         <dl>
           <dt>Sample rate</dt>

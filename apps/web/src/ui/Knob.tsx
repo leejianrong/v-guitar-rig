@@ -1,9 +1,10 @@
 import { knobToValue, type ParamSpec, valueToKnob } from "@rig/shared";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { formatValue } from "./finish";
 
 const SWEEP = 270; // degrees of travel, centred on straight up
 const PX_FULL = 180; // pixels of drag for the whole range
+const WHEEL_FULL = 1500; // wheel delta for the whole range: a mouse notch (100) is about 7%
 const KEY_STEP: Record<string, number | "min" | "max"> = {
   ArrowUp: 0.02,
   ArrowRight: 0.02,
@@ -28,10 +29,28 @@ export function Knob({
   const drag = useRef<{ y: number; p: number } | null>(null);
   const set = (p: number) => onChange(knobToValue(spec, Math.min(1, Math.max(0, p))));
   const angle = -SWEEP / 2 + pos * SWEEP;
+  const dial = useRef<HTMLDivElement>(null);
+  const latest = useRef({ pos, set });
+  latest.current = { pos, set };
+
+  // A clicked knob holds focus ("selected"); only then does the wheel turn it, so the page still scrolls.
+  // React's onWheel is passive and cannot stop the page scrolling, hence the native listener.
+  useEffect(() => {
+    const el = dial.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (document.activeElement !== el) return;
+      e.preventDefault();
+      latest.current.set(latest.current.pos - e.deltaY / WHEEL_FULL);
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
 
   return (
     <div className="knob">
       <div
+        ref={dial}
         className="knob-dial"
         role="slider"
         tabIndex={0}

@@ -1,27 +1,47 @@
 import { MODULES } from "@rig/dsp-host";
+import { finishFor } from "./finish";
+
+/** A miniature of the pedal as it looks on the board: same enamel, legend, knob count and footswitch. */
+function Thumb({ id, name, knobs }: { id: string; name: string; knobs: number }) {
+  const { finish, ink } = finishFor(id);
+  return (
+    <span
+      className="thumb"
+      aria-hidden="true"
+      style={{ "--finish": finish, "--ink": ink } as React.CSSProperties}
+    >
+      <span className="thumb-legend">{name}</span>
+      <span className="thumb-knobs">
+        {Array.from({ length: knobs }, (_, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: identical decorative dots
+          <i key={i} />
+        ))}
+      </span>
+      <span className="thumb-foot" />
+    </span>
+  );
+}
 
 export function Library({ onAdd }: { onAdd: (moduleId: string) => void }) {
   return (
-    <section className="shelf" aria-label="Pedal shelf">
+    <aside className="shelf" aria-label="Pedal shelf">
       <h2>Shelf</h2>
       <ul>
         {Object.values(MODULES).map((m) => (
           <li key={m.id}>
-            <div>
-              <strong>{m.name}</strong>
-              <span className="cat">{m.category}</span>
-              <p>{m.description}</p>
-            </div>
             <button
               type="button"
               onClick={() => onAdd(m.id)}
               aria-label={`Add ${m.name} to the board`}
+              title={m.description}
             >
-              Add
+              <Thumb id={m.id} name={m.name} knobs={m.params.length} />
+              <span className="shelf-name">{m.name}</span>
+              <span className="cat">{m.category}</span>
             </button>
           </li>
         ))}
       </ul>
-    </section>
+    </aside>
   );
 }
