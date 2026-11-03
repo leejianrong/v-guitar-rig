@@ -29,7 +29,7 @@ Vertical increments. Each ends in something you can demonstrate. Slice 1 confron
 
 #### Integration
 
-- WASM solver output for a 1 kHz sine through the diode clipper matches the ngspice transient within 2% RMS error.
+- WASM solver output for a 1 kHz sine through the diode clipper matches an independent fine-step reference within 2% RMS error (done in Rust; ngspice cross-check is a later addition).
 - The worklet loads, processes and unloads the WASM module without allocating in the audio callback.
 
 #### Unit

@@ -14,7 +14,7 @@ The long-term goal is to build pedals and amps from real transistors, tubes and 
 - The Rust core compiles a netlist into a solver using modified nodal analysis with a Newton-Raphson step per sample (companion models for reactive parts, trapezoidal integration), at 2x-4x oversampling. Wave digital filter structures may replace it for specific known topologies if profiling demands.
 - Schematic view and BOM are generated from the same netlist.
 - Device models come from a part database with documented sources (datasheet fits, Koren-style tube models). Third-party SPICE model files are not redistributed unless their licence allows.
-- Correctness is checked against ngspice transient runs (reference only, BSD) within a stated tolerance.
+- Correctness is checked against an independent fine-step backward-Euler reference in the test suite (V1), and later against ngspice transient runs (reference only, BSD) within a stated tolerance.
 - M1 proves one circuit-solved pedal (diode clipper first, then a one-transistor stage). Builder UI, LLM-authored netlists, BOM export and manufacturing are later milestones; pedals precede tube amps.
 
 ## Alternatives considered

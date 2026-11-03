@@ -8,16 +8,20 @@ Trust the code over the docs where they disagree, and update the docs in the sam
 
 | Area | State |
 |------|-------|
-| Rust DSP core (`crates/rig-core`) | Stub passthrough; solver arrives in V1 |
+| Rust DSP core (`crates/rig-core`) | V1: netlist parser, MNA/Newton solver (R, C, diode), 4x oversampler, C ABI. Tests incl. fine-step reference |
+| WASM host wrapper (`packages/dsp-host`) | V1: used by AudioWorklet and Node; headroom integration test |
+| Web app (`apps/web`) | V1: vanilla TS + Vite; clipper live in an AudioWorklet, waveform/spectrogram, loopback probe. React arrives with the V3 board UI |
 | Shared param schema (`packages/shared`) | Done, tested |
-| Web app, daemon, CLI, MCP | Not started (V1 web, V2 daemon, V5 MCP/CLI) |
-| CI / pre-push | Rust + TS lint, types, unit tests. e2e and integration jobs arrive with V1/V2 |
+| Daemon, CLI, MCP | Not started (V2 daemon, V5 MCP/CLI) |
+| CI / pre-push | Rust + TS lint/types/unit; `integration` (WASM in Node) and `e2e` (Chromium) jobs. Real-hardware checks are manual: `docs/hardware-checks.md` |
 
 ## Commands
 
 - `make` lists targets. `make install`, then `make hooks` once per clone.
 - `make check` is the fast gate (lint + types + unit tests). Run it before proposing a push; it is what pre-push runs.
-- `make wasm` builds the DSP core to WASM.
+- `make wasm` builds the DSP core to WASM. `make test-integration` and `make test-e2e` need it; e2e also needs `pnpm --filter @rig/web exec playwright install chromium` once.
+- `pnpm --filter @rig/web dev` serves the app at http://127.0.0.1:5173 (run `make wasm` first).
+- AudioWorklet scope has no `TextEncoder`, `performance` or DOM; keep worklet-imported code free of them.
 - Never put a slow or infra-needing check in `make check`.
 
 ## Workflow

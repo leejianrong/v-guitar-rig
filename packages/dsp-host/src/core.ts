@@ -11,6 +11,30 @@ interface RigExports {
   rig_destroy(circuit: number): void;
 }
 
+// AudioWorkletGlobalScope has no TextEncoder/TextDecoder, so encode UTF-8 by hand.
+function utf8Encode(s: string): Uint8Array {
+  const out: number[] = [];
+  for (const ch of s) {
+    const c = ch.codePointAt(0) ?? 0;
+    if (c < 0x80) out.push(c);
+    else if (c < 0x800) out.push(0xc0 | (c >> 6), 0x80 | (c & 63));
+    else if (c < 0x10000) out.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));
+    else
+      out.push(0xf0 | (c >> 18), 0x80 | ((c >> 12) & 63), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));
+  }
+  return Uint8Array.from(out);
+}
+
+function utf8Decode(b: Uint8Array): string {
+  let bin = "";
+  for (const v of b) bin += String.fromCharCode(v);
+  try {
+    return decodeURIComponent(escape(bin));
+  } catch {
+    return bin;
+  }
+}
+
 export class RigCircuit {
   private readonly x: RigExports;
   private handle: number;
@@ -27,7 +51,7 @@ export class RigCircuit {
     readonly blockFrames = 128,
   ) {
     this.x = instance.exports as unknown as RigExports;
-    const enc = new TextEncoder().encode(netlist);
+    const enc = utf8Encode(netlist);
     const p = this.x.rig_alloc(enc.length);
     new Uint8Array(this.x.memory.buffer, p, enc.length).set(enc);
     const h = this.x.rig_load(p, enc.length, sampleRate, oversample);
@@ -43,7 +67,7 @@ export class RigCircuit {
     const n = this.x.rig_error_len();
     const p = this.x.rig_alloc(n);
     this.x.rig_error_copy(p);
-    const s = new TextDecoder().decode(new Uint8Array(this.x.memory.buffer, p, n));
+    const s = utf8Decode(new Uint8Array(this.x.memory.buffer, p, n));
     this.x.rig_free(p, n);
     return s;
   }
