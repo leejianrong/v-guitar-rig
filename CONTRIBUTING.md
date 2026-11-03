@@ -14,7 +14,8 @@ make           # list all targets
 |---------|--------------|-------|
 | `make check` | Biome, rustfmt, clippy, type-check, unit tests (the fast gate) | nothing else |
 | `make test-integration` | The WASM core in Node: error paths, stability, CPU headroom | `make wasm` (done for you) |
-| `make test-e2e` | Headless Chromium against the test tone | `pnpm --filter @rig/web exec playwright install chromium` once |
+| `make test-e2e` | Headless Chromium: live clipper, and browser-vs-Node render parity | `pnpm --filter @rig/web exec playwright install chromium` once |
+| `make test-compose` | Boots the real docker compose stack: auth, loopback-only binding, UI connects | Docker, Playwright Chromium |
 
 CI runs the same jobs. Real-interface latency and stability can't run in CI; record them in [docs/hardware-checks.md](docs/hardware-checks.md).
 

@@ -1,0 +1,11 @@
+# The daemon serves the web UI and the API. Live audio runs in your browser, not in the container
+# (docs/adr/0001): Docker cannot reach a Windows sound card.
+services:
+  rig:
+    build: .
+    # Loopback only: nothing is exposed on other interfaces (docs/adr/0002).
+    ports:
+      - "127.0.0.1:${RIG_HOST_PORT:-7878}:7878"
+    volumes:
+      - "${RIG_DATA:-./rig}:/rig"
+    user: "${RIG_UID:-1000}:${RIG_GID:-1000}"

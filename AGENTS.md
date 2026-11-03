@@ -9,12 +9,15 @@ Trust the code over the docs where they disagree, and fix the docs in the same P
 - `make` lists targets. `make install` then `make hooks` once per clone.
 - `make check` is the fast gate and what pre-push runs. Run it before proposing a push. Never add a slow or infra-needing check to it.
 - `make test-integration` and `make test-e2e` build the WASM core first (`make wasm`). e2e also needs `pnpm --filter @rig/web exec playwright install chromium` once.
+- `make test-compose` boots the real docker stack (about a minute). `make up` runs it for manual use; rig files live in `./rig` (ignored).
+- CLI during development: `pnpm --filter @rig/daemon build` then `node packages/daemon/dist/rig.mjs <cmd>`. Exit codes: 0 ok, 1 error, 2 validation, 3 stale rev, 4 module failure.
 - Dev server: `pnpm --filter @rig/web dev` (needs `make wasm` first), http://127.0.0.1:5173.
 
 ## Constraints that aren't visible in one file
 
 - `crates/rig-core` must stay free of browser/OS calls (ADR-0001): the same code runs in an AudioWorklet and in Node.
 - AudioWorklet scope has no `TextEncoder`, `performance` or DOM. Anything imported by `apps/web/src/worklet.ts` (including `packages/dsp-host`) must avoid them.
+- The daemon is the only writer of board files (ADR-0002); boards carry `rev` and stale writes get 409/exit 3. Keep `127.0.0.1` binding and the Host check: compose publishes loopback only.
 - Generated module code is untrusted (ADR-0004). No secrets in git; `.env*` is ignored.
 - Biome does not read `.gitignore`: new generated output folders must be added to `biome.json` excludes.
 - pnpm 11 blocks dependency build scripts; allow them in `pnpm-workspace.yaml` `allowBuilds`.

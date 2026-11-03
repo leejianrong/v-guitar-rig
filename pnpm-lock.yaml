@@ -37,7 +37,27 @@ importers:
         specifier: ^7.3.7
         version: 7.3.7(@types/node@24.19.2)
 
+  packages/daemon:
+    dependencies:
+      '@rig/dsp-host':
+        specifier: workspace:*
+        version: link:../dsp-host
+      '@rig/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      '@types/node':
+        specifier: ^24.19.2
+        version: 24.19.2
+      esbuild:
+        specifier: 0.28.2
+        version: 0.28.2
+
   packages/dsp-host:
+    dependencies:
+      '@rig/shared':
+        specifier: workspace:*
+        version: link:../shared
     devDependencies:
       '@types/node':
         specifier: ^24.19.2
