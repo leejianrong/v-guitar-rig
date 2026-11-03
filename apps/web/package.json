@@ -1,0 +1,21 @@
+{
+  "name": "@rig/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc -p .",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^24.19.2",
+    "vite": "^7.3.7"
+  },
+  "dependencies": {
+    "@rig/dsp-host": "workspace:*",
+    "@rig/shared": "workspace:*"
+  }
+}
