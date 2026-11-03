@@ -1,9 +1,10 @@
-import type { Fault } from "@rig/dsp-host";
+import { type Fault, MODULES } from "@rig/dsp-host";
 import { useEffect, useState } from "react";
 import { benchmarkHeadroom, loadWasm, Rig, type Source } from "./audio";
 import { useBoard } from "./board-state";
 import { renderOffline } from "./offline";
 import { Board, tapLabel } from "./ui/Board";
+import { Inspector } from "./ui/Inspector";
 import { Library } from "./ui/Library";
 import { levelAt, Scope } from "./ui/Scope";
 
@@ -18,7 +19,9 @@ export function App() {
   const [status, setStatus] = useState("Idle");
   const [headroom, setHeadroom] = useState<number | null>(null);
   const [loop, setLoop] = useState("not measured (needs a cable from interface output to input)");
+  const [selectedId, select] = useState<string | null>(null);
   const slots = board.slots;
+  const selectedDef = MODULES[slots.find((s) => s.id === selectedId)?.module ?? ""];
   const tapAt = Math.min(tap, slots.length);
 
   useEffect(() => rig?.setSlots(slots), [rig, slots]);
@@ -132,7 +135,16 @@ export function App() {
           }
         />
         <div className="work">
-          <Board slots={slots} faults={faults} tap={tapAt} onTap={setTap} edit={edit} />
+          <Board
+            slots={slots}
+            faults={faults}
+            tap={tapAt}
+            selected={selectedDef ? selectedId : null}
+            onSelect={select}
+            onTap={setTap}
+            edit={edit}
+          />
+          {selectedDef && <Inspector def={selectedDef} />}
           <Scope rig={rig} label={tapLabel(slots, tapAt)} />
         </div>
       </div>

@@ -12,6 +12,8 @@ interface Props {
   onRemove: () => void;
   onMove: (dir: -1 | 1) => void;
   canMove: [boolean, boolean];
+  selected: boolean;
+  onSelect: () => void;
   drag: { start: () => void; drop: () => void };
 }
 
@@ -24,15 +26,22 @@ export function Pedal({
   onRemove,
   onMove,
   canMove,
+  selected,
+  onSelect,
   drag,
 }: Props) {
   const { finish, ink } = finishFor(slot.module);
   const on = !slot.bypass && !fault;
   return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: mouse shortcut; the Inspect button is the keyboard route
     <article
-      className={`pedal${on ? "" : " off"}`}
+      className={`pedal${on ? "" : " off"}${selected ? " selected" : ""}`}
       style={{ "--finish": finish, "--ink": ink } as React.CSSProperties}
       data-testid={`pedal-${def.id}`}
+      onClick={(e) => {
+        // knobs and switches handle their own clicks; the rest of the enclosure selects
+        if (!(e.target as Element).closest("button, [role=slider]")) onSelect();
+      }}
       onDragOver={(e) => e.preventDefault()}
       onDrop={drag.drop}
     >
@@ -44,6 +53,14 @@ export function Pedal({
           onClick={() => onMove(-1)}
         >
           ◀
+        </button>
+        <button
+          type="button"
+          aria-label={`Inspect ${def.name}`}
+          aria-pressed={selected}
+          onClick={onSelect}
+        >
+          ◎
         </button>
         <button type="button" aria-label={`Remove ${def.name}`} onClick={onRemove}>
           ✕
