@@ -503,3 +503,40 @@ select {
     grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
   }
 }
+
+.inspector {
+  display: grid;
+  gap: 10px;
+}
+.inspector figure {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+.inspector canvas {
+  width: 100%;
+  height: auto;
+  background: #0b0d0f;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  display: block;
+}
+.inspector figcaption {
+  font: 11px var(--mono);
+  color: var(--muted);
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.key {
+  width: 14px;
+  height: 3px;
+  display: inline-block;
+}
+.key.before {
+  background: #6b7680;
+}
+.key.after {
+  background: var(--signal);
+  margin-left: 10px;
+}
