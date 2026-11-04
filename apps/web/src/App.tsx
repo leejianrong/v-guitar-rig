@@ -1,4 +1,5 @@
 import type { Fault } from "@rig/dsp-host";
+import { STARTER_RIFFS } from "@rig/dsp-host";
 import { useEffect, useRef, useState } from "react";
 import { benchmarkHeadroom, loadWasm, Rig, type Source } from "./audio";
 import { useBoard } from "./board-state";
@@ -17,6 +18,8 @@ export function App() {
   const [blocked, setBlocked] = useState<string | null>(null);
   const [rig, setRig] = useState<Rig | null>(null);
   const [source, setSource] = useState<Source>("tone");
+  const [riffId, setRiffId] = useState(STARTER_RIFFS[0]?.id ?? "");
+  const [playing, setPlaying] = useState(false);
   const [level, setLevel] = useState(0.9);
   const [volume, setVolume] = useState(0.8);
   const [tap, setTap] = useState(1 << 20); // clamped below; starts at the output
@@ -42,6 +45,9 @@ export function App() {
   const inspected = slots.findIndex((s) => s.id === selectedId);
   useEffect(() => rig?.inspect(inspected), [rig, inspected]);
   useEffect(() => rig?.setLevel(level), [rig, level]);
+  useEffect(() => {
+    rig?.playRiff(playing ? (STARTER_RIFFS.find((r) => r.id === riffId) ?? null) : null);
+  }, [rig, riffId, playing]);
   useEffect(() => rig?.setVolume(volume), [rig, volume]);
   useEffect(() => {
     if (!rig) return;
@@ -81,6 +87,7 @@ export function App() {
     try {
       const r = await Rig.start(source, slots, sources, level, volume);
       setRig(r);
+      setPlaying(source === "riff");
       setStatus("Running");
       const h = await benchmarkHeadroom();
       setHeadroom(h);
@@ -111,8 +118,26 @@ export function App() {
           >
             <option value="tone">Test tone (110 Hz)</option>
             <option value="guitar">Guitar input</option>
+            <option value="riff">Virtual guitar (riff)</option>
           </select>
         </label>
+        {source === "riff" && (
+          <>
+            <label>
+              Riff
+              <select value={riffId} onChange={(e) => setRiffId(e.target.value)}>
+                {STARTER_RIFFS.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button type="button" disabled={!rig} onClick={() => setPlaying(!playing)}>
+              {playing ? "Pause riff" : "Play riff"}
+            </button>
+          </>
+        )}
         <label>
           Input level
           <input

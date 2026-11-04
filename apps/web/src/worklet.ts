@@ -5,10 +5,11 @@ import {
   compileModule,
   type Fault,
   Framer,
+  GuitarSynth,
   MODULES,
   type ModuleDef,
 } from "@rig/dsp-host";
-import type { Slot } from "@rig/shared";
+import type { Riff, Slot } from "@rig/shared";
 
 const PROBE_FRAMES = 48000; // record one second after the click
 export const TAP_FRAME = 2048;
@@ -19,7 +20,9 @@ type InMsg =
   | { type: "modules"; sources: string[] }
   | { type: "tap"; index: number }
   | { type: "inspect"; slot: number }
-  | { type: "probe" };
+  | { type: "probe" }
+  | { type: "input"; synth: boolean; level: number }
+  | { type: "riff"; riff: Riff | null; loop: boolean };
 
 class RigProcessor extends AudioWorkletProcessor {
   private chain: Chain | null = null;
@@ -35,6 +38,10 @@ class RigProcessor extends AudioWorkletProcessor {
   private inFrames = new Framer(TAP_FRAME);
   private outFrames = new Framer(TAP_FRAME);
   private faultsSent = 0;
+  /** The virtual guitar, used in place of the input when the source is a riff. */
+  private readonly synth = new GuitarSynth(sampleRate);
+  private useSynth = false;
+  private synthLevel = 1;
   private probeLeft = 0;
   private probeRec = new Float32Array(PROBE_FRAMES);
   private probePos = 0;
@@ -59,6 +66,12 @@ class RigProcessor extends AudioWorkletProcessor {
         this.inspectSlot = m.slot;
         this.inFrames.reset();
         this.outFrames.reset();
+      } else if (m.type === "input") {
+        this.useSynth = m.synth;
+        this.synthLevel = m.level;
+      } else if (m.type === "riff") {
+        if (m.riff) this.synth.play(m.riff, m.loop);
+        else this.synth.stop();
       } else if (m.type === "probe") {
         this.probeLeft = PROBE_FRAMES;
         this.probePos = 0;
@@ -120,7 +133,10 @@ class RigProcessor extends AudioWorkletProcessor {
       for (const ch of out) ch.fill(0);
       return true;
     }
-    this.tmpIn.set(input ?? this.tmpOut.fill(0));
+    if (this.useSynth) {
+      this.synth.process(this.tmpIn);
+      for (let i = 0; i < BLOCK; i++) this.tmpIn[i] = (this.tmpIn[i] as number) * this.synthLevel;
+    } else this.tmpIn.set(input ?? this.tmpOut.fill(0));
     chain.process(this.tmpIn, this.tmpOut);
     for (const ch of out) ch.set(this.tmpOut);
 
