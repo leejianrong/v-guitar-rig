@@ -74,6 +74,14 @@ export function validateRiff(input: unknown): RiffValidation {
   return errors.length > 0 ? { ok: false, errors } : { ok: true, riff: input as Riff };
 }
 
+/** `notes` with each length set the way a tab implies: until the next note on its string, or the end. */
+export function relength(notes: RiffNote[], beats: number, min = 0.25): RiffNote[] {
+  return notes.map((n) => {
+    const next = notes.filter((m) => m.string === n.string && m.at > n.at).map((m) => m.at);
+    return { ...n, length: Math.max(Math.min(...next, beats) - n.at, min) };
+  });
+}
+
 /** A tab in the layout `formatTab` writes: first digits line up, marks take no time (see `parseTab`). */
 export const TAB_EXAMPLE = `e|5-h8p5---------|
 B|--------7b9----|
@@ -160,11 +168,9 @@ export function parseTab(text: string, step = 0.5): TabParse {
     slots += count;
   }
   const beats = slots * step;
-  for (const n of notes) {
-    const next = notes.filter((m) => m.string === n.string && m.at > n.at).map((m) => m.at);
-    n.length = Math.max(Math.min(...next, beats) - n.at, step);
-  }
-  return errors.length > 0 ? { ok: false, errors } : { ok: true, notes, beats };
+  return errors.length > 0
+    ? { ok: false, errors }
+    : { ok: true, notes: relength(notes, beats, step), beats };
 }
 
 /** The tab text for `riff`, notes snapped to `step`. The inverse of `parseTab` for everything but lengths. */

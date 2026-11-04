@@ -1,4 +1,5 @@
 import type { Fault } from "@rig/dsp-host";
+import type { Riff } from "@rig/shared";
 import { useEffect, useRef, useState } from "react";
 import { benchmarkHeadroom, loadWasm, Rig, type Source } from "./audio";
 import { useBoard } from "./board-state";
@@ -8,6 +9,7 @@ import { renderOffline } from "./offline";
 import { Board, tapLabel } from "./ui/Board";
 import { Inspector, pairLevels } from "./ui/Inspector";
 import { Library } from "./ui/Library";
+import { RiffEditor } from "./ui/RiffEditor";
 import { levelAt, Scope } from "./ui/Scope";
 
 export function App() {
@@ -18,8 +20,9 @@ export function App() {
   const [blocked, setBlocked] = useState<string | null>(null);
   const [rig, setRig] = useState<Rig | null>(null);
   const [source, setSource] = useState<Source>("tone");
-  const [riffId, setRiffId] = useState("pentatonic-lick");
+  const [draft, setDraft] = useState<Riff | undefined>(undefined); // the riff being edited, saved or not
   const [playing, setPlaying] = useState(false);
+  const [repeat, setRepeat] = useState(true); // the riff loops
   const [level, setLevel] = useState(0.9);
   const [volume, setVolume] = useState(0.8);
   const [tap, setTap] = useState(1 << 20); // clamped below; starts at the output
@@ -45,16 +48,23 @@ export function App() {
   const inspected = slots.findIndex((s) => s.id === selectedId);
   useEffect(() => rig?.inspect(inspected), [rig, inspected]);
   useEffect(() => rig?.setLevel(level), [rig, level]);
-  const riff = riffs.find((r) => r.id === riffId);
-  // restart only when the chosen riff itself changes, not whenever the list is fetched again
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `riff` is read through its id and rev
+  // the first riff, once the list is here; after that a riff is picked on purpose
   useEffect(() => {
-    rig?.playRiff(playing && riff ? riff : null);
-  }, [rig, riff?.id, riff?.rev, playing]);
+    if (!draft) setDraft(riffs.find((r) => r.id === "pentatonic-lick"));
+  }, [riffs, draft]);
+
+  const last = useRef({ playing: false, riffId: "" });
+  useEffect(() => {
+    // an edit while playing is swapped in at the playhead; picking or starting begins at the top
+    const keep = playing && last.current.playing && last.current.riffId === draft?.id;
+    last.current = { playing, riffId: draft?.id ?? "" };
+    rig?.playRiff(playing && draft ? draft : null, repeat, keep);
+  }, [rig, playing, draft, repeat]);
   useEffect(() => rig?.setVolume(volume), [rig, volume]);
   useEffect(() => {
     if (!rig) return;
     const offs = [
+      rig.onBeat((b) => b.ended && setPlaying(false)),
       rig.onFaults(setFaults),
       rig.onProbe((r) =>
         setLoop(
@@ -124,23 +134,6 @@ export function App() {
             <option value="riff">Virtual guitar (riff)</option>
           </select>
         </label>
-        {source === "riff" && (
-          <>
-            <label>
-              Riff
-              <select value={riffId} onChange={(e) => setRiffId(e.target.value)}>
-                {riffs.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button type="button" disabled={!rig} onClick={() => setPlaying(!playing)}>
-              {playing ? "Pause riff" : "Play riff"}
-            </button>
-          </>
-        )}
         <label>
           Input level
           <input
@@ -224,6 +217,20 @@ export function App() {
           />
           {selectedDef && selectedSlot && (
             <Inspector def={selectedDef} slot={selectedSlot} rig={rig} />
+          )}
+          {source === "riff" && draft && (
+            <RiffEditor
+              draft={draft}
+              riffs={riffs}
+              connected={link === "connected"}
+              rig={rig}
+              playing={playing}
+              loop={repeat}
+              onChange={setDraft}
+              onPick={(id) => setDraft(riffs.find((r) => r.id === id) ?? draft)}
+              onPlay={() => setPlaying(!playing)}
+              onLoop={setRepeat}
+            />
           )}
           <Scope rig={rig} label={tapLabel(catalog, slots, tapAt)} />
         </div>

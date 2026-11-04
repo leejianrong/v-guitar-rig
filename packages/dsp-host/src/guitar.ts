@@ -167,6 +167,8 @@ export class GuitarSynth {
   private bpm = 120;
   private loop = false;
   playing = false;
+  /** True from the moment a riff that is not looping reaches its end, until the next `play`. */
+  finished = false;
 
   constructor(
     readonly sampleRate: number,
@@ -175,14 +177,24 @@ export class GuitarSynth {
     this.strings = Array.from({ length: 6 }, () => new GuitarString(sampleRate, pickup));
   }
 
-  play(riff: Riff, loop: boolean) {
+  /**
+   * Start `riff` from the top, or with `keep` swap it in where the playhead is, so edits are heard
+   * without restarting: notes already struck keep ringing and are not struck again.
+   */
+  play(riff: Riff, loop: boolean, keep = false) {
     this.events = schedule(riff, this.sampleRate);
     this.length = Math.round(((riff.beats * 60) / riff.bpm) * this.sampleRate);
     this.bpm = riff.bpm;
     this.loop = loop;
-    this.next = 0;
-    this.pos = 0;
     this.playing = true;
+    this.finished = false;
+    if (keep && this.pos < this.length) {
+      const ahead = this.events.findIndex((e) => e.at >= this.pos);
+      this.next = ahead < 0 ? this.events.length : ahead;
+    } else {
+      this.next = 0;
+      this.pos = 0;
+    }
   }
 
   stop() {
@@ -202,7 +214,10 @@ export class GuitarSynth {
           if (this.loop) {
             this.pos = 0;
             this.next = 0;
-          } else this.stop();
+          } else {
+            this.stop();
+            this.finished = true;
+          }
         }
         for (let e = this.events[this.next]; e && e.at <= this.pos; e = this.events[++this.next]) {
           const s = this.strings[e.string] as GuitarString;

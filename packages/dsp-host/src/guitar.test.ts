@@ -137,4 +137,27 @@ describe("guitar synth techniques", () => {
     expect(peak(looped, at(1.0), at(1.1))).toBeGreaterThan(0.1);
     expect(peak(looped, at(2.0), at(2.1))).toBeGreaterThan(0.1);
   });
+
+  it("swaps in an edited riff where it is playing, without striking earlier notes again", () => {
+    const first = riffOf([{ string: 6, fret: 0, at: 0, length: 4 }], 8);
+    const edited = riffOf(
+      [
+        { string: 6, fret: 0, at: 0, length: 4 },
+        { string: 1, fret: 5, at: 4, length: 4 },
+      ],
+      8,
+    );
+    const synth = new GuitarSynth(SR);
+    synth.play(first, true);
+    const out = new Float32Array(4 * SR);
+    const block = new Float32Array(128);
+    for (let i = 0; i < out.length; i += 128) {
+      if (i === at(1.0) - (at(1.0) % 128)) synth.play(edited, true, true); // one second in
+      synth.process(block);
+      out.set(block, i);
+    }
+    // the low string was struck once, at 0 s; after the swap only the new high note arrives, at beat 4 (2 s)
+    expect(peak(out, at(1.05), at(1.15))).toBeLessThan(0.5 * peak(out, 0, at(0.1)));
+    expect(rms(out, at(2.0), at(2.2))).toBeGreaterThan(1.5 * rms(out, at(1.8), at(2.0)));
+  });
 });

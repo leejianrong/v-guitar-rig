@@ -22,7 +22,7 @@ type InMsg =
   | { type: "inspect"; slot: number }
   | { type: "probe" }
   | { type: "input"; synth: boolean; level: number }
-  | { type: "riff"; riff: Riff | null; loop: boolean };
+  | { type: "riff"; riff: Riff | null; loop: boolean; keep: boolean };
 
 class RigProcessor extends AudioWorkletProcessor {
   private chain: Chain | null = null;
@@ -42,6 +42,8 @@ class RigProcessor extends AudioWorkletProcessor {
   private readonly synth = new GuitarSynth(sampleRate);
   private useSynth = false;
   private synthLevel = 1;
+  private beatTick = 0;
+  private endedSent = false;
   private probeLeft = 0;
   private probeRec = new Float32Array(PROBE_FRAMES);
   private probePos = 0;
@@ -70,7 +72,8 @@ class RigProcessor extends AudioWorkletProcessor {
         this.useSynth = m.synth;
         this.synthLevel = m.level;
       } else if (m.type === "riff") {
-        if (m.riff) this.synth.play(m.riff, m.loop);
+        this.endedSent = false;
+        if (m.riff) this.synth.play(m.riff, m.loop, m.keep);
         else this.synth.stop();
       } else if (m.type === "probe") {
         this.probeLeft = PROBE_FRAMES;
@@ -108,6 +111,13 @@ class RigProcessor extends AudioWorkletProcessor {
     }
   }
 
+  /** True once, when a riff that is not looping has finished. */
+  private endedOnce(): boolean {
+    if (!this.synth.finished || this.endedSent) return false;
+    this.endedSent = true;
+    return true;
+  }
+
   process(inputs: Float32Array[][], outputs: Float32Array[][]): boolean {
     const out = outputs[0];
     const input = inputs[0]?.[0];
@@ -135,6 +145,9 @@ class RigProcessor extends AudioWorkletProcessor {
     }
     if (this.useSynth) {
       this.synth.process(this.tmpIn);
+      if (++this.beatTick % 16 === 0)
+        // about 23 times a second: the editor's playhead
+        this.port.postMessage({ type: "beat", beat: this.synth.beat, ended: this.endedOnce() });
       for (let i = 0; i < BLOCK; i++) this.tmpIn[i] = (this.tmpIn[i] as number) * this.synthLevel;
     } else this.tmpIn.set(input ?? this.tmpOut.fill(0));
     chain.process(this.tmpIn, this.tmpOut);

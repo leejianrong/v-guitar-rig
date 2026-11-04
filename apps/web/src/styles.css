@@ -587,3 +587,134 @@ select {
   padding: 7px 10px;
   text-align: left;
 }
+
+/* riff editor: a six-string tab with a playhead, under the board */
+.riffed {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.riffbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  align-items: center;
+}
+.riffbar label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--muted);
+}
+.riffbar input[type="number"],
+.riffbar input[type="text"] {
+  background: var(--floor);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 8px;
+}
+.riffbar input[type="number"] {
+  width: 4.5em;
+}
+.riffbar .unit {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.riffbar .play {
+  background: var(--signal);
+  color: #1a1205;
+  border-color: var(--signal);
+  font-weight: 600;
+}
+.tab {
+  --col: 2.7rem;
+  --label: 1.6rem;
+  overflow-x: auto;
+  min-width: 0;
+  margin: 0;
+  padding: 0 0 6px;
+  border: 0;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.tabgrid {
+  position: relative;
+  display: grid;
+  width: max-content;
+  background: var(--floor);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.tabrow {
+  display: grid;
+  grid-template-columns: var(--label) repeat(var(--cols), var(--col));
+  align-items: center;
+}
+.tabname {
+  text-align: center;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.cell {
+  position: relative;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: linear-gradient(#4a525a, #4a525a) center / 100% 1px no-repeat;
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--signal);
+}
+.cell.beat {
+  box-shadow: inset 1px 0 0 #232830;
+}
+.cell.bar {
+  box-shadow: inset 2px 0 0 #3a424a;
+}
+.cell:hover:not(:disabled) {
+  background-color: #1d2227;
+}
+.cell:focus-visible {
+  outline-offset: -2px;
+  background-color: #2a2210;
+}
+.cell span {
+  background: var(--floor);
+  padding: 1px 3px;
+  border-radius: 3px;
+}
+.cell:focus-visible span {
+  background: #2a2210;
+}
+.playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--label);
+  width: 2px;
+  background: var(--signal);
+  box-shadow: 0 0 10px 1px rgba(255, 179, 71, 0.55);
+  pointer-events: none;
+}
+.hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+kbd {
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
