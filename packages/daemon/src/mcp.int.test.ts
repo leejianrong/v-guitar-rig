@@ -126,6 +126,12 @@ describe("MCP server", () => {
     expect(bad.text).toContain("no-such@1");
   });
 
+  it("finds a preset from a plain-words request", async () => {
+    const r = await tool("search_presets", { query: "heavy metal riffs" });
+    expect(r.isError).toBe(false);
+    expect(r.json().hits[0].id).toBe("iron-wall");
+  });
+
   it("returns a stale rev as a tool error the model can act on", async () => {
     const board = (await tool("get_board")).json();
     const r = await tool("set_board", { board, expectedRev: board.rev - 1 });
