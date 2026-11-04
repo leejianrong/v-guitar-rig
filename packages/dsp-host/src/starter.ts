@@ -1,3 +1,4 @@
+import { amp } from "./amp";
 import type { ModuleDef, Processor } from "./modules";
 
 const TWO_PI = 2 * Math.PI;
@@ -215,4 +216,4 @@ const gate: ModuleDef = {
   },
 };
 
-export const STARTER: ModuleDef[] = [overdrive, fuzz, delay, chorus, reverb, gate];
+export const STARTER: ModuleDef[] = [overdrive, fuzz, delay, chorus, reverb, gate, amp];

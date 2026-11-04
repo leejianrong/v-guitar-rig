@@ -4,7 +4,7 @@ import type { ModuleDef, Processor } from "./modules";
 import { ModuleError } from "./render";
 
 const ID = /^[a-z][a-z0-9-]{0,40}@[1-9][0-9]{0,3}$/;
-const CATEGORIES = new Set(["drive", "time", "mod", "dynamics"]);
+const CATEGORIES = new Set(["drive", "time", "mod", "dynamics", "amp", "cab"]);
 const TAPERS = new Set(["linear", "log", "audio"]);
 const MAX_PARAMS = 12;
 
@@ -64,7 +64,7 @@ export function compileModule(source: string, realm?: Realm): ModuleDef {
   if (typeof spec.name !== "string" || !spec.name) bad(id, "needs a name");
   if (typeof spec.description !== "string") bad(id, "needs a description");
   if (!CATEGORIES.has(spec.category as string))
-    bad(id, "category must be drive, time, mod or dynamics");
+    bad(id, "category must be drive, time, mod, dynamics, amp or cab");
   // plain data copied into the host, so no object of the realm's is kept
   const params = JSON.parse(JSON.stringify(spec.params ?? null)) as ParamSpec[];
   if (!Array.isArray(params) || params.length > MAX_PARAMS)

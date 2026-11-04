@@ -21,7 +21,7 @@ export type Visual =
 export interface ModuleInfo {
   id: string;
   name: string;
-  category: "drive" | "time" | "mod" | "dynamics";
+  category: "drive" | "time" | "mod" | "dynamics" | "amp" | "cab";
   description: string;
   params: ParamSpec[];
   visual?(params: Readonly<Record<string, number>>): Visual;

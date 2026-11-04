@@ -12,7 +12,7 @@ Module source is the BODY of a function that returns the module object:
   return {
     id: "warm-drive@1",            // lowercase-with-dashes@version, at most 41 chars before @
     name: "Warm Drive",
-    category: "drive",             // drive | time | mod | dynamics
+    category: "drive",             // drive | time | mod | dynamics | amp | cab
     description: "Soft saturation.",
     params: [                      // at most 12; every field is required
       { id: "drive", label: "Drive", min: 1, max: 20, default: 4, unit: "x", taper: "log" } // taper: linear | log (min > 0) | audio
