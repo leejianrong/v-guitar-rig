@@ -1,6 +1,7 @@
 /** Enamel colour and screen-print ink for each pedal's enclosure. Chrome only: the DSP never sees this. */
 export const FINISH: Record<string, { finish: string; ink: string }> = {
   "diode-clipper@1": { finish: "#2f5d50", ink: "#e9efe7" },
+  "wah@1": { finish: "#3b4048", ink: "#f1efe9" },
   "overdrive@1": { finish: "#d27a1f", ink: "#1b1206" },
   "fuzz@1": { finish: "#6d3a86", ink: "#f2e9f7" },
   "delay@1": { finish: "#2d6a9a", ink: "#eaf3fa" },
