@@ -27,14 +27,15 @@ Module source is the BODY of a function that returns the module object:
     },
   };
 
-There is no process, require, fetch, import, DOM or Date; only the language and Math. Do not allocate in process().
+There is no process, require, fetch, import, DOM or Date; only the language's own built-ins (Math, typed arrays such as Float32Array). Allocate buffers in create(), never in process().
 
 Workflow:
 1. list_modules to see what exists. Reuse a built-in id only as a reference; pick a new id.
 2. Write the source and call new_module. A failure gives the reason (compile error, NaN or Inf, output growing without bound, too slow, throwing). Fix that and call new_module again; replacing an id needs expectedRev from get_module.
-3. get_board, then set_board with your module added to slots: {id: <any unique string>, module: <module id>, bypass: false, params: {}}. Send the board's current rev as expectedRev; on a stale rev, get_board again.
-4. render the board and read the descriptors (loudness, brightness, band balance, THD) to check it sounds as intended: more drive should raise thdPercent and crestDb should fall; a dreamy sound has a low centroidHz and a high-ish air band. Adjust params or code and repeat.
-Output must stay finite and below about 8x full scale or the module is rejected. A master limiter is always on.`;
+3. get_board, then set_board with your module added to slots: {id: <any unique string>, module: <module id>, bypass: false, params: {}}. The board object's own rev is used as expectedRev unless you pass one; on a stale rev, get_board again.
+4. render the board and read the descriptors, which describe the whole board's output, not your pedal alone. To judge one pedal, render once with it bypassed (set_board with bypass: true) and once active, and compare.
+   Descriptors: rmsDb, peakDb, crestDb (peak minus rms); centroidHz (spectral centre, lower = darker); rolloffHz (below it lies 85% of the energy); bandsDb in dB relative to the total over low 20-200 Hz, lowMid 200-800, mid 800-3k, high 3k-8k, air 8k+; thdPercent (energy at harmonics 2-8 of a 110 Hz tone, so a drive raises it, and a comb-like delay or chorus changes it too, so only trust it for drive). Expected moves: more drive raises thdPercent and lowers crestDb; a darker tone lowers centroidHz and the high and air bands; more wet delay or reverb raises rmsDb and may raise crestDb as echoes add to peaks. Adjust params or code and repeat.
+Output must stay finite and at or below 8x full scale on the gate's tests (impulse, noise, square, DC, at default, minimum and maximum knobs), and not grow over time, or the module is rejected. A master limiter is always on.`;
 
 const obj = (properties: Args, required: string[] = []) => ({
   type: "object",
