@@ -47,8 +47,13 @@ export const FIND_A_TONE = `The player asked for a sound ("sound like David Gilm
 4. Tune it: apply the tone guide (prompts/get tune-a-tone) for words like spacier, then render again and check the descriptor moved. Keep peakDb below 0. Tell the player what you changed and what the numbers did.
 5. Only if no preset or built-in module can give the sound, write a new module (prompts/get build-a-pedal), add it to the board, and tune it the same way.`;
 
+/** How the boards are laid out, in the tone guide. */
+const RIG_LAYOUT = `Layout: drive, wah and dynamics pedals go before the amp. The amp is a preamp@1 then a poweramp@1 (amp@1 is both in one module, with no loop). Pedals between the two are the amp's effects loop, the place for delay, reverb, chorus and other time and modulation effects, because the power amp then pushes them through the speaker like the rest of the sound. cab@1 comes last.`;
+
 /** How to nudge a loaded board by tone words, served as the `tune-a-tone` prompt. */
 export const TONE_GUIDE = `Tuning a board by tone words: change a few knobs, render, and read the descriptor that should move.
+
+${RIG_LAYOUT}
 
 "spacier", "dreamier", "more ambient": apply these moves with set_board (or render the edited board first), then check that tailMs rose (it measured at least +1000 ms on every starter preset, capped at 6000) and that peakDb is still below 0. If it is not, lower the amp's master by the overshoot. A delay or reverb the board lacks is added first.
 ${TONE_RULES.spacier.steps

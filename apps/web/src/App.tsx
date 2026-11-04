@@ -10,6 +10,7 @@ import {
   useCatalog,
   usePresets,
   useRiffs,
+  withPedal,
 } from "./catalog";
 import { FrameCounter } from "./frames";
 import { renderOffline } from "./offline";
@@ -226,9 +227,7 @@ export function App() {
             edit(() => slotsOf(p));
             select(null);
           }}
-          onAdd={(id) =>
-            edit((s) => [...s, { id: crypto.randomUUID(), module: id, bypass: false, params: {} }])
-          }
+          onAdd={(id) => edit((s) => withPedal(s, id, catalog[id]?.category ?? ""))}
         />
         <div className="work">
           <Board

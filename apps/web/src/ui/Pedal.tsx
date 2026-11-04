@@ -3,7 +3,8 @@ import type { Slot } from "@rig/shared";
 import { finishFor } from "./finish";
 import { Knob } from "./Knob";
 
-interface Props {
+/** What any box on the board needs: the pedal, an amp panel and the speaker cabinet share it. */
+export interface UnitProps {
   slot: Slot;
   def: ModuleInfo;
   fault?: string;
@@ -29,7 +30,7 @@ export function Pedal({
   selected,
   onSelect,
   drag,
-}: Props) {
+}: UnitProps) {
   const { finish, ink } = finishFor(slot.module);
   const on = !slot.bypass && !fault;
   return (

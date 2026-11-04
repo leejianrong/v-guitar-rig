@@ -1,4 +1,4 @@
-import type { Slot } from "./board";
+import { loopInsertAt, type Slot } from "./board";
 
 /** One knob move: add `by` to a param, kept within `[min, max]` (the module's own range clamps the rest). */
 interface Step {
@@ -42,7 +42,9 @@ export function applyTone(slots: Slot[], rule: keyof typeof TONE_RULES): Slot[] 
         bypass: false,
         params: {},
       };
-      next.push(slot);
+      const loop = loopInsertAt(next); // time effects belong in the amp's loop when it has one
+      if (loop >= 0) next.splice(loop, 0, slot);
+      else next.push(slot);
     }
     slot.params[step.param] = Math.min(
       step.max,
