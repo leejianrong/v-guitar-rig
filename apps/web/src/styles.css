@@ -684,7 +684,8 @@ select {
 .cell:hover:not(:disabled) {
   background-color: #1d2227;
 }
-.cell:focus-visible {
+.cell.sel {
+  outline: 2px solid var(--signal);
   outline-offset: -2px;
   background-color: #2a2210;
 }
@@ -693,8 +694,14 @@ select {
   padding: 1px 3px;
   border-radius: 3px;
 }
-.cell:focus-visible span {
+.cell.sel span {
   background: #2a2210;
+}
+.cellbar .cellname {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--signal);
+  min-width: 11ch;
 }
 .playhead {
   position: absolute;
@@ -717,4 +724,83 @@ kbd {
   padding: 0 4px;
   border: 1px solid var(--line);
   border-radius: 4px;
+}
+
+/* output meter: a strip of loudness bars in the signal amber; the peak turns red near full scale */
+.meter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+  align-items: center;
+  padding: 10px 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.meterrow {
+  flex: 1 1 9rem;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 2px 6px;
+  align-items: baseline;
+}
+.metername {
+  color: var(--muted);
+  font-size: 13px;
+}
+.meterbar {
+  grid-column: 1 / -1;
+  height: 8px;
+  background: var(--floor);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.meterfill {
+  height: 100%;
+  background: var(--signal);
+}
+.meterfill.hot {
+  background: var(--led);
+}
+.meterval {
+  font-family: var(--mono);
+  text-align: right;
+}
+.meterunit {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* collapsible shelf sections and the loaded preset */
+h1 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.logo {
+  display: block;
+  border-radius: 8px;
+}
+.shelf summary {
+  cursor: pointer;
+  list-style: none;
+}
+.shelf summary::-webkit-details-marker {
+  display: none;
+}
+.shelf summary h2::before {
+  content: "▾";
+  display: inline-block;
+  width: 1ch;
+  color: var(--muted);
+}
+.shelf details:not([open]) summary h2::before {
+  content: "▸";
+}
+.shelf .presets li button[aria-current="true"] {
+  border-color: var(--signal);
+  background: #2a2210;
+  box-shadow: inset 3px 0 0 var(--signal);
 }

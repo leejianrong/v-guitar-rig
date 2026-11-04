@@ -1,4 +1,5 @@
 import type { Riff } from "@rig/shared";
+import { type Biquad, design, newBiquad, run } from "./biquad";
 
 /** MIDI note of each open string, string 1 (high e) first: standard tuning. */
 export const OPEN_STRINGS = [64, 59, 55, 50, 45, 40] as const;
@@ -6,6 +7,8 @@ export const OPEN_STRINGS = [64, 59, 55, 50, 45, 40] as const;
 const SIZE = 2048; // ring length: covers the lowest bent note at 96 kHz
 const MASK = SIZE - 1;
 const LN1000 = Math.log(1000); // a 60 dB fall
+/** Steel strings on an electric: a hard pick, and a loop that keeps its highs and rings for seconds. */
+const STEEL = { a: 0.07, t60: 10, pick: 0.8 };
 const midiHz = (m: number) => 440 * 2 ** ((m - 69) / 12);
 
 interface Event {
@@ -68,8 +71,8 @@ class GuitarString {
   private delay = 100;
   private gain = 0.99;
   private lp = 0;
-  private a = 0.22; // low-pass coefficient: higher is darker
-  private t60 = 2;
+  private a = STEEL.a; // low-pass coefficient: higher is darker
+  private t60 = STEEL.t60;
   private releasing = false;
   private quiet = 0;
   private seed = 1;
@@ -104,8 +107,8 @@ class GuitarString {
   }
 
   pluck(semis: number, palm: boolean) {
-    this.a = palm ? 0.55 : 0.22;
-    this.t60 = palm ? 0.25 : 2;
+    this.a = palm ? 0.55 : STEEL.a;
+    this.t60 = palm ? 0.25 : STEEL.t60;
     this.releasing = false;
     this.semis = semis;
     this.glideTo = semis;
@@ -116,7 +119,7 @@ class GuitarString {
     let soft = 0;
     for (let k = 0; k < n; k++) {
       this.seed = (Math.imul(this.seed, 1664525) + 1013904223) >>> 0;
-      soft += 0.45 * (this.seed / 2 ** 31 - 1 - soft); // a soft pick
+      soft += STEEL.pick * (this.seed / 2 ** 31 - 1 - soft); // a soft pick
       burst[k] = soft;
     }
     const comb = Math.max(1, Math.round(0.12 * n)); // picked 12% along the string
@@ -166,6 +169,8 @@ export class GuitarSynth {
   private length = 0;
   private bpm = 120;
   private loop = false;
+  /** A magnetic pickup's resonant peak: the "quack" an electric has and an acoustic lacks. */
+  private readonly pickupPeak: Biquad = newBiquad();
   playing = false;
   /** True from the moment a riff that is not looping reaches its end, until the next `play`. */
   finished = false;
@@ -174,6 +179,7 @@ export class GuitarSynth {
     readonly sampleRate: number,
     pickup = 0.1,
   ) {
+    design(this.pickupPeak, "peak", 2800, sampleRate, 5, 1.2);
     this.strings = Array.from({ length: 6 }, () => new GuitarString(sampleRate, pickup));
   }
 
@@ -229,7 +235,7 @@ export class GuitarSynth {
       }
       let sum = 0;
       for (const s of this.strings) if (s.active) sum += s.tick();
-      out[i] = sum * 0.1; // a chord peaks near 0.8, a single note near 0.3, like a guitar into an interface
+      out[i] = run(this.pickupPeak, sum) * 0.07; // a chord peaks near 0.95, a single note near 0.25, like a guitar into an interface
     }
   }
 }

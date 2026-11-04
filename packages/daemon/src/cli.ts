@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { ModuleError, renderRiff } from "@rig/dsp-host";
+import { ModuleError, measureLoudness, renderRiff } from "@rig/dsp-host";
 import {
   type Board,
   type Preset,
@@ -154,11 +154,12 @@ export async function runCli(argv: string[], io: Io): Promise<number> {
       };
       const { output: out, descriptors } = await renderAny(env, board, input, sampleRate);
       writeFileSync(resolve(io.cwd, outPath), encodeWav(out, sampleRate));
-      const summary = { out: outPath, frames: out.length, sampleRate, descriptors };
+      const loudness = measureLoudness(out, sampleRate);
+      const summary = { out: outPath, frames: out.length, sampleRate, descriptors, loudness };
       io.out(
         json
           ? `${JSON.stringify(summary)}\n`
-          : `wrote ${outPath} (${out.length} frames, peak ${descriptors.peakDb} dB, centroid ${descriptors.centroidHz} Hz, THD ${descriptors.thdPercent}%)\n`,
+          : `wrote ${outPath} (${out.length} frames, peak ${descriptors.peakDb} dB, ${loudness.integrated.toFixed(1)} LUFS, centroid ${descriptors.centroidHz} Hz, THD ${descriptors.thdPercent}%)\n`,
       );
       return EXIT.ok;
     }

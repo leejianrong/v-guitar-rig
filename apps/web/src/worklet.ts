@@ -6,6 +6,7 @@ import {
   type Fault,
   Framer,
   GuitarSynth,
+  LoudnessMeter,
   MODULES,
   type ModuleDef,
 } from "@rig/dsp-host";
@@ -21,6 +22,7 @@ type InMsg =
   | { type: "tap"; index: number }
   | { type: "inspect"; slot: number }
   | { type: "probe" }
+  | { type: "meter-reset" }
   | { type: "input"; synth: boolean; level: number }
   | { type: "riff"; riff: Riff | null; loop: boolean; keep: boolean };
 
@@ -43,6 +45,8 @@ class RigProcessor extends AudioWorkletProcessor {
   private useSynth = false;
   private synthLevel = 1;
   private beatTick = 0;
+  private readonly meter = new LoudnessMeter(sampleRate);
+  private meterTick = 0;
   private endedSent = false;
   private probeLeft = 0;
   private probeRec = new Float32Array(PROBE_FRAMES);
@@ -68,7 +72,8 @@ class RigProcessor extends AudioWorkletProcessor {
         this.inspectSlot = m.slot;
         this.inFrames.reset();
         this.outFrames.reset();
-      } else if (m.type === "input") {
+      } else if (m.type === "meter-reset") this.meter.reset();
+      else if (m.type === "input") {
         this.useSynth = m.synth;
         this.synthLevel = m.level;
       } else if (m.type === "riff") {
@@ -152,6 +157,8 @@ class RigProcessor extends AudioWorkletProcessor {
     } else this.tmpIn.set(input ?? this.tmpOut.fill(0));
     chain.process(this.tmpIn, this.tmpOut);
     for (const ch of out) ch.set(this.tmpOut);
+    this.meter.push(this.tmpOut);
+    if (++this.meterTick % 12 === 0) this.port.postMessage({ type: "meter", ...this.meter.read() });
 
     const tap =
       chain.taps[

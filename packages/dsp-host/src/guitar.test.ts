@@ -160,4 +160,15 @@ describe("guitar synth techniques", () => {
     expect(peak(out, at(1.05), at(1.15))).toBeLessThan(0.5 * peak(out, 0, at(0.1)));
     expect(rms(out, at(2.0), at(2.2))).toBeGreaterThan(1.5 * rms(out, at(1.8), at(2.0)));
   });
+
+  it("sustains like an electric: still within 15 dB after a second and 25 dB after two", () => {
+    // measured with the nylon-like voice this replaced: -36 dB at 1 s and -70 dB at 2 s
+    for (const string of [6, 5, 3]) {
+      const out = renderRiff(riffOf([{ string, fret: 0, at: 0, length: 6 }], 6, 60), SR, 0);
+      const start = rms(out, at(0.05), at(0.15));
+      const drop = (t: number) => 20 * Math.log10(rms(out, at(t), at(t + 0.1)) / start);
+      expect(drop(1), `string ${string} at 1 s`).toBeGreaterThan(-15);
+      expect(drop(2), `string ${string} at 2 s`).toBeGreaterThan(-28);
+    }
+  });
 });

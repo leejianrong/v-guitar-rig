@@ -2,9 +2,12 @@ import { readFileSync } from "node:fs";
 import { testClip, validatePreset } from "@rig/shared";
 import { describe, expect, it } from "vitest";
 import { describeBoard } from "./describe";
+import { renderRiff } from "./guitar";
+import { measureLoudness } from "./loudness";
 import { KNOWN_MODULES } from "./modules";
 import { STARTER_PRESETS } from "./presets";
 import { renderBoard } from "./render";
+import { STARTER_RIFFS } from "./riffs";
 
 const wasm = new WebAssembly.Module(
   readFileSync(
@@ -31,10 +34,10 @@ describe("starter presets", () => {
     }
   });
 
-  it.each(measured)("$p.id renders finite and below full scale", ({ out, d }) => {
+  // Headroom is checked at guitar level on the riffs (below); the test clip is much hotter than a guitar.
+  it.each(measured)("$p.id renders finite and loud enough to hear", ({ out, d }) => {
     expect(out.every(Number.isFinite)).toBe(true);
-    expect(d.peakDb).toBeLessThanOrEqual(0);
-    expect(d.rmsDb).toBeGreaterThan(-30); // loud enough to hear
+    expect(d.rmsDb).toBeGreaterThan(-30);
   });
 
   // The thresholds come from the measured set: every clean preset reads at most 15.5% THD, every
@@ -47,5 +50,21 @@ describe("starter presets", () => {
     if (has("bright")) expect(d.centroidHz).toBeGreaterThanOrEqual(185);
     if (has("dark")) expect(d.centroidHz).toBeLessThanOrEqual(130);
     if (has("clean")) expect(has("crunch") || has("high-gain") || has("fuzz")).toBe(false);
+  });
+});
+
+describe("preset loudness", () => {
+  it("is within 1 LU of -16 LUFS on the shipped riffs for every preset, without clipping", () => {
+    const clips = STARTER_RIFFS.map((r) => renderRiff(r, 48000, 1.5));
+    const means = STARTER_PRESETS.map((p) => {
+      const board = { schema: 1 as const, id: p.id, name: p.name, rev: 0, slots: p.slots };
+      const l = clips.map((c) => measureLoudness(renderBoard(wasm, board, c), 48000));
+      const mean = l.reduce((a, x) => a + x.integrated, 0) / l.length;
+      expect(Math.abs(mean + 16), `${p.id} reads ${mean.toFixed(1)} LUFS`).toBeLessThan(1);
+      expect(Math.max(...l.map((x) => x.peak)), `${p.id} peak`).toBeLessThan(-1);
+      return mean;
+    });
+    // before levelling the presets spanned 24 LU
+    expect(Math.max(...means) - Math.min(...means)).toBeLessThan(2);
   });
 });

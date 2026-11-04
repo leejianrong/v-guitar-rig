@@ -6,6 +6,7 @@ export * from "./fft";
 export * from "./framer";
 export * from "./gate";
 export * from "./guitar";
+export * from "./loudness";
 export * from "./modules";
 export * from "./presets";
 export * from "./probe";

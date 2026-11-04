@@ -28,3 +28,52 @@ test("picking a preset replaces the board with its pedals and knob settings sile
   await expect.poll(() => page.evaluate(() => window.__rig?.level(110))).toBeGreaterThan(-60);
   await page.screenshot({ path: "test-results/preset.png" });
 });
+
+test("the loaded preset is highlighted until the board is edited", async ({ page }) => {
+  await page.goto("/");
+  const preset = (name: string) => page.getByRole("button", { name: `Load preset ${name}` });
+  await expect(page.locator("[aria-current=true]")).toHaveCount(0);
+
+  await preset("Blue Crunch").click();
+  await expect(preset("Blue Crunch")).toHaveAttribute("aria-current", "true");
+  await expect(page.locator("[aria-current=true]")).toHaveCount(1);
+  await page.screenshot({ path: "test-results/preset-highlight.png" });
+
+  // turning a knob makes the board something else: the highlight goes
+  const drive = page.getByTestId("pedal-overdrive@1").getByRole("slider", { name: "Drive" });
+  await drive.focus();
+  await page.keyboard.press("ArrowUp");
+  await expect(page.locator("[aria-current=true]")).toHaveCount(0);
+
+  // choosing another preset highlights that one instead
+  await preset("Iron Wall").click();
+  await expect(preset("Iron Wall")).toHaveAttribute("aria-current", "true");
+  await expect(page.locator("[aria-current=true]")).toHaveCount(1);
+});
+
+test("the presets and shelf panels collapse and open", async ({ page }) => {
+  await page.goto("/");
+  const preset = page.getByRole("button", { name: "Load preset Glass Clean" });
+  const pedal = page.getByRole("button", { name: "Add Overdrive to the board" });
+  await expect(preset).toBeVisible();
+  await expect(pedal).toBeVisible();
+
+  await page.getByRole("heading", { name: "Presets" }).click();
+  await expect(preset).toBeHidden();
+  await expect(pedal).toBeVisible(); // the shelf is its own panel
+  await page.getByRole("heading", { name: "Shelf" }).click();
+  await expect(pedal).toBeHidden();
+  await page.getByRole("heading", { name: "Presets" }).click();
+  await expect(preset).toBeVisible();
+});
+
+test("the tab has a favicon and the header shows the logo", async ({ page, request }) => {
+  await page.goto("/");
+  const href = await page.locator('link[rel="icon"]').getAttribute("href");
+  expect(href).toBe("/favicon.svg");
+  const res = await request.get("/favicon.svg");
+  expect(res.ok()).toBe(true);
+  expect(res.headers()["content-type"]).toContain("svg");
+  await expect(page.locator("img.logo")).toBeVisible();
+  await page.locator("header.bar").screenshot({ path: "test-results/header-logo.png" });
+});

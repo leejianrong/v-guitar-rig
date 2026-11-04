@@ -9,6 +9,7 @@ import {
   noteAt,
   resize,
   setFret,
+  setTech,
   slugOf,
   stepFor,
   toggleTech,
@@ -61,7 +62,9 @@ export function RiffEditor(p: RiffEditorProps) {
 
   useEffect(
     () =>
-      rig?.onBeat(({ beat }) => {
+      rig?.onBeat(({ beat: heard }) => {
+        // the audio takes `latencyMs` to reach the speakers: draw where the sound is, not where the synth is
+        const beat = Math.max(0, heard - (rig.latencyMs / 60000) * draft.bpm);
         const h = head.current;
         const g = grid.current;
         if (!h || !g) return;
@@ -72,7 +75,7 @@ export function RiffEditor(p: RiffEditorProps) {
         if (at > g.scrollLeft + g.clientWidth * 0.85) g.scrollLeft = at - g.clientWidth * 0.15;
         else if (at < g.scrollLeft) g.scrollLeft = Math.max(0, at - 40);
       }),
-    [rig, step],
+    [rig, step, draft.bpm],
   );
 
   const focusCell = (string: number, slot: number) => {
@@ -115,6 +118,7 @@ export function RiffEditor(p: RiffEditorProps) {
     }
   }
 
+  const current = noteAt(draft, cursor.string, cursor.slot, step);
   const saved = riffs.find((r) => r.id === draft.id);
   const shipped = STARTER_RIFFS.some((r) => r.id === draft.id);
   const dirty = !same(draft, saved);
@@ -221,6 +225,71 @@ export function RiffEditor(p: RiffEditorProps) {
         <output className="status">{dirty && !message ? "Unsaved changes" : message}</output>
       </div>
 
+      <div className="riffbar cellbar">
+        <span className="cellname">
+          {NAMES[cursor.string - 1]} string, step {cursor.slot + 1}
+        </span>
+        <label>
+          Fret
+          <input
+            type="number"
+            min={0}
+            max={24}
+            value={current?.fret ?? ""}
+            placeholder="-"
+            onChange={(e) =>
+              p.onChange(
+                e.target.value === ""
+                  ? clearCell(draft, cursor.string, cursor.slot, step)
+                  : setFret(
+                      draft,
+                      cursor.string,
+                      cursor.slot,
+                      step,
+                      Math.round(Number(e.target.value)),
+                    ),
+              )
+            }
+          />
+        </label>
+        <label>
+          Technique
+          <select
+            disabled={!current}
+            value={current?.tech ?? ""}
+            onChange={(e) =>
+              p.onChange(
+                setTech(
+                  draft,
+                  cursor.string,
+                  cursor.slot,
+                  step,
+                  (e.target.value || undefined) as Technique | undefined,
+                  current?.bend,
+                ),
+              )
+            }
+          >
+            <option value="">None</option>
+            <option value="hammer">Hammer-on</option>
+            <option value="pull">Pull-off</option>
+            <option value="slide">Slide</option>
+            <option value="bend">Bend</option>
+            <option value="palm">Palm mute</option>
+          </select>
+        </label>
+        <button
+          type="button"
+          disabled={!current}
+          onClick={() => p.onChange(clearCell(draft, cursor.string, cursor.slot, step))}
+        >
+          Clear note
+        </button>
+        {!rig && <span className="status">Start audio to hear it</span>}
+        {draft.notes.length === 0 && (
+          <span className="status">Empty: click a cell, then type a fret number</span>
+        )}
+      </div>
       <fieldset
         className="tab"
         ref={grid}
@@ -243,7 +312,7 @@ export function RiffEditor(p: RiffEditorProps) {
                     type="button"
                     tabIndex={here ? 0 : -1}
                     data-cell={`${i + 1}-${slot}`}
-                    className={`cell${n ? " on" : ""}${bar ? " bar" : beatStart ? " beat" : ""}`}
+                    className={`cell${n ? " on" : ""}${here ? " sel" : ""}${bar ? " bar" : beatStart ? " beat" : ""}`}
                     aria-label={`String ${i + 1}, step ${slot + 1}${n ? `: fret ${n.fret}${n.tech ? `, ${n.tech}` : ""}` : ""}`}
                     onClick={() => setCursor({ string: i + 1, slot })}
                   >
