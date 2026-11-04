@@ -54,7 +54,7 @@ const USAGE = `rig: virtual guitar rig
   rig module new FILE.js [--expected-rev N]   add a generated module (checked in the sandbox first)
   rig module check ID                         re-run the safety gate on a stored module
   rig module list
-  rig preset list | get ID | new FILE.json [--expected-rev N]   presets (a board plus tags)
+  rig preset list | get ID | search WORDS... | new FILE.json [--expected-rev N]   presets (a board plus tags)
   rig mcp [--url URL] [--rig-dir DIR]          MCP server on stdio for an LLM client (needs a running daemon)
 
 Exit codes: 0 ok, 1 error, 2 validation, 3 stale rev, 4 module failure.`;
@@ -175,6 +175,11 @@ export async function runCli(argv: string[], io: Io): Promise<number> {
         res = await call("GET", `/api/boards/${need("a board id", pos[2])}`);
       } else if (cmd === "preset" && sub === "list") {
         res = await call("GET", "/api/presets");
+      } else if (cmd === "preset" && sub === "search") {
+        res = await call(
+          "GET",
+          `/api/presets/search?q=${encodeURIComponent(need("what to look for", pos.slice(2).join(" ")))}`,
+        );
       } else if (cmd === "preset" && sub === "get") {
         res = await call("GET", `/api/presets/${need("a preset id", pos[2])}`);
       } else if (cmd === "preset" && sub === "new") {

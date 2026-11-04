@@ -92,6 +92,12 @@ const TOOLS = [
     inputSchema: obj({}),
   },
   {
+    name: "search_presets",
+    description:
+      'Find presets for a request in plain words ("David Gilmour", "dreamy ambient", "heavy metal"). Ranked by artist, genre, era and descriptor tags; each hit says which tags matched. Empty when nothing matches.',
+    inputSchema: obj({ query: str("what the player asked for") }, ["query"]),
+  },
+  {
     name: "get_preset",
     description: "One preset with its slots.",
     inputSchema: obj({ id: str("preset id") }, ["id"]),
@@ -139,6 +145,8 @@ const route = (name: string, a: Args): [string, string, unknown?] | null => {
     }
     case "list_presets":
       return ["GET", "/api/presets"];
+    case "search_presets":
+      return ["GET", `/api/presets/search?q=${encodeURIComponent(String(a.query ?? ""))}`];
     case "get_preset":
       return ["GET", `/api/presets/${id}`];
     case "set_preset": {

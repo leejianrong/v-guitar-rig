@@ -4,7 +4,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo } from "node:net";
 import { extname, join, normalize, sep } from "node:path";
 import { MODULES, ModuleError } from "@rig/dsp-host";
-import { type Board, testClip, validateBoard } from "@rig/shared";
+import { type Board, searchPresets, testClip, validateBoard } from "@rig/shared";
 import { renderAny } from "./render";
 import { checkModule, SANDBOX_SCRIPT } from "./sandbox";
 import { RigStore } from "./store";
@@ -150,6 +150,10 @@ export async function startServer(opts: ServeOptions): Promise<Running> {
     if (parts[1] === "presets") {
       if (parts.length === 2 && method === "GET")
         return send(res, 200, { presets: store.listPresets() });
+      if (parts[2] === "search" && parts.length === 3 && method === "GET")
+        return send(res, 200, {
+          hits: searchPresets(store.listPresets(), url.searchParams.get("q") ?? ""),
+        });
       const id = parts[2];
       if (id && parts.length === 3 && method === "GET") {
         const p = store.getPreset(id);

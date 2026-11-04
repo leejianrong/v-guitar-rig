@@ -413,6 +413,22 @@ describe("presets", () => {
     );
   });
 
+  it("searches presets from the API and the CLI, with the same answer each time", async () => {
+    const q = encodeURIComponent("I want to sound like David Gilmour");
+    const hits = (
+      (await (await api(`/api/presets/search?q=${q}`)).json()) as {
+        hits: { id: string; matched: string[] }[];
+      }
+    ).hits;
+    expect(hits[0]?.id).toBe("gilmour-lead");
+    expect(hits[0]?.matched).toContain("artist:david-gilmour");
+    const viaCli = await cli(["preset", "search", "dreamy", "ambient", "--json"]);
+    expect(viaCli.code).toBe(EXIT.ok);
+    expect(JSON.parse(viaCli.out).hits[0].id).toBe("echo-drift");
+    expect((await cli(["preset", "search", "dreamy", "ambient", "--json"])).out).toBe(viaCli.out);
+    expect((await cli(["preset", "search"])).code).toBe(EXIT.validation);
+  });
+
   it("refuses bad tags and unknown modules with exit 2", async () => {
     const badTag = file("t.json", { ...preset, id: "bad-tag", tags: ["Not A Slug"] });
     expect((await cli(["preset", "new", badTag])).code).toBe(EXIT.validation);
