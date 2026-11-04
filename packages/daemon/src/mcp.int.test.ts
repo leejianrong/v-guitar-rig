@@ -126,6 +126,25 @@ describe("MCP server", () => {
     expect(bad.text).toContain("no-such@1");
   });
 
+  it("serves the tone guide, and adding a delay and reverb grows the measured tail", async () => {
+    const guide = (await rpc("prompts/get", { name: "tune-a-tone" })).result as {
+      messages: { content: { text: string } }[];
+    };
+    expect(guide.messages[0]?.content.text).toContain("delay@1 feedback: +0.15");
+    const base = (await tool("get_preset", { id: "blue-crunch" })).json();
+    const board = { schema: 1, id: "default", name: "t", rev: 0, slots: base.slots };
+    const spacier = structuredClone(board);
+    spacier.slots.push(
+      { id: "d", module: "delay@1", bypass: false, params: { feedback: 0.55, mix: 0.4 } },
+      { id: "r", module: "reverb@1", bypass: false, params: { mix: 0.45, size: 0.7 } },
+    );
+    const [a, b] = [
+      await tool("render", { board, seconds: 1 }),
+      await tool("render", { board: spacier, seconds: 1 }),
+    ];
+    expect(b.json().descriptors.tailMs).toBeGreaterThan(a.json().descriptors.tailMs + 1000);
+  });
+
   it("finds a preset from a plain-words request", async () => {
     const r = await tool("search_presets", { query: "heavy metal riffs" });
     expect(r.isError).toBe(false);

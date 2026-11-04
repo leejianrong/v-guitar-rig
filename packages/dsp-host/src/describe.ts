@@ -17,6 +17,11 @@ export interface Descriptors {
   bandsDb: { low: number; lowMid: number; mid: number; high: number; air: number };
   /** Distortion of a 110 Hz tone through the same board, harmonics 2-8 over the fundamental. */
   thdPercent: number;
+  /**
+   * How long a tone's sound lasts after the playing stops: ms until the level, measured in 10 ms windows, has
+   * fallen 60 dB below what it was while playing (0 if it stops at once, capped at 6000).
+   */
+  tailMs: number;
 }
 
 const FFT = 4096;
@@ -96,8 +101,22 @@ export function thdPercent(x: Float32Array, sampleRate: number, f0: number): num
 
 const TONE_HZ = 110;
 const TONE_LEVEL = 0.25;
+const TAIL_MAX_S = 6;
 
-/** Describe what `board` did: spectral descriptors of its `output`, and its distortion on a fresh tone. */
+/** Time after `tone` ends for the sound in `after` to fall 60 dB below its level at the end of the tone. */
+export function tailMs(played: Float32Array, after: Float32Array, sampleRate: number): number {
+  const rms = (x: Float32Array) =>
+    Math.sqrt(x.reduce((a, v) => a + v * v, 0) / Math.max(1, x.length));
+  const ref = rms(played.subarray(played.length - sampleRate / 10));
+  if (ref < 1e-6) return 0;
+  const win = Math.round(sampleRate / 100);
+  let last = -1;
+  for (let w = 0; (w + 1) * win <= after.length; w++)
+    if (rms(after.subarray(w * win, (w + 1) * win)) >= ref * 1e-3) last = w;
+  return (last + 1) * 10;
+}
+
+/** Describe what `board` did: spectral descriptors of its `output`, and its response to a fresh tone. */
 export function describeBoard(
   wasm: WebAssembly.Module,
   board: Board,
@@ -105,13 +124,15 @@ export function describeBoard(
   sampleRate = 48000,
   registry: Record<string, ModuleDef> = MODULES,
 ): Descriptors {
-  const tone = Float32Array.from(
-    { length: sampleRate },
-    (_, i) => TONE_LEVEL * Math.sin((2 * Math.PI * TONE_HZ * i) / sampleRate),
-  );
-  const settled = renderBoard(wasm, board, tone, sampleRate, registry).subarray(sampleRate / 2);
+  // one second of tone, then silence for the tail
+  const tone = new Float32Array(sampleRate * (1 + TAIL_MAX_S));
+  for (let i = 0; i < sampleRate; i++)
+    tone[i] = TONE_LEVEL * Math.sin((2 * Math.PI * TONE_HZ * i) / sampleRate);
+  const heard = renderBoard(wasm, board, tone, sampleRate, registry);
+  const played = heard.subarray(0, sampleRate);
   return {
     ...spectralDescriptors(output, sampleRate),
-    thdPercent: thdPercent(settled, sampleRate, TONE_HZ),
+    thdPercent: thdPercent(played.subarray(sampleRate / 2), sampleRate, TONE_HZ),
+    tailMs: tailMs(played, heard.subarray(sampleRate), sampleRate),
   };
 }
