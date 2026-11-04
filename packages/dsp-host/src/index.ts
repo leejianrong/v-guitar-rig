@@ -6,5 +6,6 @@ export * from "./fft";
 export * from "./framer";
 export * from "./gate";
 export * from "./modules";
+export * from "./presets";
 export * from "./probe";
 export * from "./render";
