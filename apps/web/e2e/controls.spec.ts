@@ -61,7 +61,7 @@ test("shelf is on the left with thumbnails and adds pedals", async ({ page }) =>
   const board = page.getByRole("region", { name: "Pedalboard" });
   const [s, b] = await Promise.all([shelf.boundingBox(), board.boundingBox()]);
   expect((s?.x ?? 1e9) + (s?.width ?? 0)).toBeLessThanOrEqual(b?.x ?? 0);
-  await expect(shelf.locator(".thumb")).toHaveCount(7);
+  await expect(shelf.locator(".thumb")).toHaveCount(8);
   await shelf.getByRole("button", { name: "Add Fuzz to the board" }).click();
   await expect(page.getByTestId("pedal-fuzz@1")).toBeVisible();
 });

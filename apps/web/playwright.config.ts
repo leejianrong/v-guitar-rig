@@ -4,6 +4,7 @@ export default defineConfig({
   testDir: "e2e",
   timeout: 60_000,
   fullyParallel: false,
+  workers: 1, // the 60 s frame-rate soak must not compete with other specs for the CPU
   use: {
     baseURL: "http://127.0.0.1:4173",
     launchOptions: { args: ["--autoplay-policy=no-user-gesture-required"] },

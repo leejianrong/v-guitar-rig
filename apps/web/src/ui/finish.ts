@@ -6,6 +6,7 @@ export const FINISH: Record<string, { finish: string; ink: string }> = {
   "delay@1": { finish: "#2d6a9a", ink: "#eaf3fa" },
   "chorus@1": { finish: "#2a9d9a", ink: "#06201f" },
   "reverb@1": { finish: "#a9adb3", ink: "#14171a" },
+  "amp@1": { finish: "#1d1d20", ink: "#e8c987" },
   "noise-gate@1": { finish: "#b83d3a", ink: "#fbeceb" },
 };
 

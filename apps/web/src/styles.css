@@ -251,6 +251,16 @@ select {
 .knobs.k3 .knob:last-child {
   grid-column: 1 / -1;
 }
+/* four or more knobs: smaller dials, three across from five up */
+.knobs.k4,
+.knobs.k5,
+.knobs.k6 {
+  grid-template-columns: repeat(2, 1fr);
+}
+.knobs.k5,
+.knobs.k6 {
+  grid-template-columns: repeat(3, 1fr);
+}
 .knob {
   display: grid;
   justify-items: center;
@@ -261,6 +271,11 @@ select {
   border-radius: 50%;
   touch-action: none;
   cursor: ns-resize;
+}
+.knobs.k4 .knob-dial,
+.knobs.k5 .knob-dial,
+.knobs.k6 .knob-dial {
+  width: 46px;
 }
 .knob-dial:focus {
   outline: none;
