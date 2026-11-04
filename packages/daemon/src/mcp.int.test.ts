@@ -3,6 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
+import { applyTone } from "@rig/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { type Running, startServer } from "./server";
 
@@ -143,6 +144,42 @@ describe("MCP server", () => {
       await tool("render", { board: spacier, seconds: 1 }),
     ];
     expect(b.json().descriptors.tailMs).toBeGreaterThan(a.json().descriptors.tailMs + 1000);
+  });
+
+  it("follows the preset-first prompt from a request to a tuned board with no module authoring", async () => {
+    const list = (await rpc("prompts/list")).result as { prompts: { name: string }[] };
+    expect(list.prompts.map((x) => x.name)).toContain("find-a-tone");
+    const text = (
+      (await rpc("prompts/get", { name: "find-a-tone" })).result as {
+        messages: { content: { text: string } }[];
+      }
+    ).messages[0]?.content.text;
+    expect(text).toContain("search_presets");
+
+    const calls: string[] = [];
+    const call = async (name: string, args: unknown) => {
+      calls.push(name);
+      return tool(name, args);
+    };
+    const hit = (
+      await call("search_presets", { query: "I want to sound like David Gilmour" })
+    ).json().hits[0];
+    const preset = (await call("get_preset", { id: hit.id })).json();
+    const board = (await call("get_board", {})).json();
+    const loaded = (await call("set_board", { board: { ...board, slots: preset.slots } })).json();
+    const before = (await call("render", { seconds: 1 })).json();
+    // "more spacey": the documented moves, as the guide gives them
+    const spacier = { ...loaded, slots: applyTone(loaded.slots, "spacier") };
+    const after = (await call("render", { board: spacier, seconds: 1 })).json();
+
+    expect(preset.tags).toContain("artist:david-gilmour");
+    expect(loaded.slots.map((x: { module: string }) => x.module)).toEqual(
+      preset.slots.map((x: { module: string }) => x.module),
+    );
+    expect(after.descriptors.tailMs).toBeGreaterThanOrEqual(
+      Math.min(before.descriptors.tailMs + 1000, 6000),
+    );
+    expect(calls).not.toContain("new_module");
   });
 
   it("finds a preset from a plain-words request", async () => {
