@@ -106,3 +106,28 @@ test("transfer curve is measured without audio running and follows the fuzz knob
     path: "test-results/curve.png",
   });
 });
+
+test("frequency response is measured and turning Tone moves the cutoff", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Add Overdrive to the board" }).click();
+  const od = page.getByTestId("pedal-overdrive@1");
+  await od.getByRole("heading").click();
+
+  const summary = page.getByTestId("response-summary");
+  const cutoff = async () => {
+    const m = /falls 3 dB at ([\d.]+) (kHz|Hz)/.exec((await summary.textContent()) ?? "");
+    return m ? Number(m[1]) * (m[2] === "kHz" ? 1000 : 1) : Number.NaN;
+  };
+  await expect.poll(cutoff).toBeGreaterThan(2500); // default tone 3 kHz
+  expect(await cutoff()).toBeLessThan(3500);
+
+  await od.getByRole("slider", { name: "Tone" }).focus();
+  await page.keyboard.press("End"); // 8 kHz
+  await expect.poll(cutoff).toBeGreaterThan(6500);
+  await page.keyboard.press("Home"); // 800 Hz
+  await expect.poll(cutoff).toBeLessThan(1000);
+
+  await page.getByLabel("Frequency response at a small signal level").screenshot({
+    path: "test-results/response.png",
+  });
+});

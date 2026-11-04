@@ -1,9 +1,17 @@
-import { type CurvePoint, type ModuleDef, measureTransfer } from "@rig/dsp-host";
+import {
+  type CurvePoint,
+  levelNear,
+  type ModuleDef,
+  measureResponse,
+  measureTransfer,
+  powerDb,
+  type ResponsePoint,
+  rolloffHz,
+} from "@rig/dsp-host";
 import type { Slot } from "@rig/shared";
 import { useEffect, useRef, useState } from "react";
 import { loadWasm, type Pair, type Rig } from "../audio";
 import { Envelope, toDb } from "../envelope";
-import { levelNear, powerDb } from "../fft";
 
 const F_MIN = 40;
 const F_MAX = 16000;
@@ -13,6 +21,7 @@ const H = 200;
 const ENV_H = 110;
 const ENV_DB_MIN = -54;
 const ENV_DB_MAX = 6; // headroom above full scale, so a full-scale signal does not hug the edge
+const RESP_H = 160;
 const CURVE = 220; // square plot, in canvas pixels
 const CURVE_DB = [-60, 6] as const;
 const HISTORY = 160; // frames of envelope shown, about 7 s
@@ -164,23 +173,73 @@ function drawCurve(c: HTMLCanvasElement, curve: CurvePoint[]) {
   g.stroke();
 }
 
+function drawResponse(c: HTMLCanvasElement, curve: ResponsePoint[]) {
+  const g = c.getContext("2d");
+  if (!g) return;
+  const top = Math.ceil(Math.max(...curve.map((p) => p.db)) / 6) * 6 + 6; // a 48 dB window under the peak
+  const y = (db: number) => ((top - Math.max(top - 48, Math.min(top, db))) / 48) * RESP_H;
+  g.fillStyle = "#0b0d0f";
+  g.fillRect(0, 0, W, RESP_H);
+  g.font = "11px 'IBM Plex Mono', monospace";
+  g.fillStyle = "#8d949b";
+  g.strokeStyle = "#1f2429";
+  g.lineWidth = 1;
+  for (let db = top - 12; db > top - 48; db -= 12) {
+    g.beginPath();
+    g.moveTo(0, y(db));
+    g.lineTo(W, y(db));
+    g.stroke();
+    g.fillText(`${db >= 0 ? "+" : ""}${db} dB`, 6, y(db) - 3);
+  }
+  for (const f of [100, 1000, 10000]) {
+    g.beginPath();
+    g.moveTo(xOf(f), 0);
+    g.lineTo(xOf(f), RESP_H);
+    g.stroke();
+    g.fillText(f >= 1000 ? `${f / 1000}k` : `${f}`, xOf(f) + 4, RESP_H - 6);
+  }
+  g.strokeStyle = "#ffb347";
+  g.lineWidth = 2;
+  g.beginPath();
+  for (let x = 0; x < W; x++) {
+    const hz = F_MIN * (F_MAX / F_MIN) ** (x / W);
+    const at = Math.min(curve.length - 2, Math.max(0, hz / (curve[0]?.hz ?? 1) - 1));
+    const [lo, t] = [Math.floor(at), at - Math.floor(at)];
+    const db = (curve[lo]?.db ?? 0) * (1 - t) + (curve[lo + 1]?.db ?? 0) * t;
+    if (x === 0) g.moveTo(x, y(db));
+    else g.lineTo(x, y(db));
+  }
+  g.stroke();
+}
+
 /** What the selected pedal is doing to the signal. */
 export function Inspector({ def, slot, rig }: { def: ModuleDef; slot: Slot; rig: Rig | null }) {
   const spec = useRef<HTMLCanvasElement>(null);
   const env = useRef<HTMLCanvasElement>(null);
   const gain = useRef<HTMLOutputElement>(null);
   const curveCanvas = useRef<HTMLCanvasElement>(null);
+  const respCanvas = useRef<HTMLCanvasElement>(null);
   const [summary, setSummary] = useState("measuring...");
+  const [rolloff, setRolloff] = useState("measuring...");
 
   // Measured on a copy of the module, a moment after the last knob move, so it never touches the live one.
   const params = JSON.stringify(slot.params);
   useEffect(() => {
     let live = true;
     const t = setTimeout(async () => {
-      const curve = measureTransfer(def, await loadWasm(), JSON.parse(params));
+      const [wasm, now] = [await loadWasm(), JSON.parse(params)];
+      const curve = measureTransfer(def, wasm, now);
+      const response = measureResponse(def, wasm, now);
       const [first, last] = [curve[0], curve[curve.length - 1]];
-      if (!live || !first || !last || !curveCanvas.current) return;
+      if (!live || !first || !last || !curveCanvas.current || !respCanvas.current) return;
       drawCurve(curveCanvas.current, curve);
+      drawResponse(respCanvas.current, response);
+      const cut = rolloffHz(response);
+      setRolloff(
+        cut === null
+          ? "no roll-off below 24 kHz"
+          : `falls 3 dB at ${cut >= 1000 ? `${(cut / 1000).toFixed(1)} kHz` : `${Math.round(cut)} Hz`}`,
+      );
       const small = first.outDb - first.inDb;
       const top = Math.max(...curve.map((c) => c.outDb));
       setSummary(
@@ -232,6 +291,17 @@ export function Inspector({ def, slot, rig }: { def: ModuleDef; slot: Slot; rig:
         />
         <figcaption data-testid="curve-summary">
           measured transfer curve (dashed: a plain wire) · {summary}
+        </figcaption>
+      </figure>
+      <figure>
+        <canvas
+          ref={respCanvas}
+          width={W}
+          height={RESP_H}
+          aria-label="Frequency response at a small signal level"
+        />
+        <figcaption data-testid="response-summary">
+          measured frequency response, quiet signal · {rolloff}
         </figcaption>
       </figure>
       <figure>
