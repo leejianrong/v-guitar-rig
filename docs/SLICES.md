@@ -226,6 +226,34 @@ Stories are on Pandan board VGR, epic VGR-E4 (25 points).
 
 - The capture module exposes the common param schema and reports its sample rate.
 
+## V8: Riffs, virtual guitar, amp with effects loop, wah
+
+**Delivers:** test a tone on a riff, an amp that looks and works like one. Decisions in ADR-0008. Done.
+
+**Build plan**
+
+1. Riffs as JSON (and ASCII tab) in `rig/riffs`, with a plucked-string guitar synth shared by the worklet and Node; CLI, MCP and `render --riff`.
+2. Tab editor with playhead, loop and live edit; audio-file source.
+3. LUFS meter (BS.1770); presets levelled to -16 LUFS on the shipped riffs.
+4. Amp split into preamp and power amp (`amp@1` kept), drawn as one head with a SEND/RETURN loop; presets moved to the new layout.
+5. Wah with a treadle.
+
+**Demo:** Load Cosmic Lead, play the pentatonic riff, drag the delay in and out of the loop and watch the Level strip.
+
+### Test plan
+
+#### End-to-end
+
+- Edit a riff in the browser and hear it; a riff written through the CLI plays; the meter reads the output; the wah's low tone falls at the toe.
+
+#### Integration
+
+- Every preset renders loud enough and sits within tolerance of -16 LUFS; a pedal in the loop is pushed through the power stage.
+
+#### Unit
+
+- Synth tuning within 0.4 cents; the EBU reference reads -23.0 LUFS; preamp plus power amp match `amp@1` to 1e-5; tab parse and format round-trip.
+
 ## Later milestones (not sliced yet)
 
 - M2: circuit builder, more parts (BJT, JFET, op-amp, triode), schematic view, BOM export.
