@@ -441,3 +441,88 @@ describe("presets", () => {
     expect((await api("/api/presets/bad-tag")).status).toBe(404);
   });
 });
+
+describe("riffs", () => {
+  const tab = [
+    "e|5h8p5---|",
+    "B|--------|",
+    "G|--------|",
+    "D|--------|",
+    "A|0---0---|",
+    "E|--------|",
+  ].join("\n");
+  const put = (id: string, body: unknown) =>
+    api(`/api/riffs/${id}`, { method: "PUT", body: JSON.stringify(body) });
+
+  it("saves a riff written as ASCII tab, lists it, and refuses stale or shipped ids", async () => {
+    writeFileSync(join(dir, "r.txt"), tab);
+    const made = await cli(["riff", "new", "r.txt", "--id", "tab-lick", "--bpm", "90"]);
+    expect(made.code).toBe(EXIT.ok);
+    const got = (await (await api("/api/riffs/tab-lick")).json()) as {
+      bpm: number;
+      beats: number;
+      notes: { string: number; fret: number; tech?: string }[];
+    };
+    expect([got.bpm, got.beats]).toEqual([90, 3]);
+    expect(got.notes.map((n) => `${n.string}:${n.fret}${n.tech ?? ""}`)).toEqual([
+      "1:5",
+      "1:8hammer",
+      "1:5pull",
+      "5:0",
+      "5:0",
+    ]);
+    const listed = (await (await api("/api/riffs")).json()) as { riffs: { id: string }[] };
+    expect(listed.riffs.map((r) => r.id)).toEqual(
+      expect.arrayContaining(["clean-arpeggio", "tab-lick"]),
+    );
+    expect(
+      (await cli(["riff", "new", "r.txt", "--id", "tab-lick", "--expected-rev", "9"])).code,
+    ).toBe(EXIT.staleRev);
+    expect((await cli(["riff", "new", "r.txt", "--id", "clean-arpeggio"])).code).toBe(
+      EXIT.validation,
+    );
+  });
+
+  it("says what is wrong with a tab it cannot read", async () => {
+    const res = await put("bad-tab", {
+      expectedRev: 0,
+      tab: { tab: "e|5x8|\nB|-|\nG|-|\nD|-|\nA|-|\nE|-|" },
+    });
+    expect(res.status).toBe(422);
+    expect(JSON.stringify(await res.json())).toContain('unexpected \\"x\\"');
+    expect((await put("bad-riff", { expectedRev: 0, riff: { schema: 1 } })).status).toBe(422);
+  });
+
+  it("renders a riff through a board, from the API and the CLI", async () => {
+    const render = async (body: unknown) =>
+      (await (await api("/api/render", { method: "POST", body: JSON.stringify(body) })).json()) as {
+        frames: number;
+        peak: number;
+        error?: string;
+      };
+    // clean-arpeggio is 8 beats at 90 bpm (5.33 s) plus a 1.5 s tail
+    const a = await render({ board: "default", riff: "clean-arpeggio" });
+    expect(a.frames).toBe(Math.round(((8 * 60) / 90 + 1.5) * 48000));
+    expect(a.peak).toBeGreaterThan(0.05);
+    const unsaved = await render({ board: "default", riff: { tab, bpm: 120 } });
+    expect(unsaved.frames).toBe(Math.round(((3 * 60) / 120 + 1.5) * 48000));
+    const missing = await api("/api/render", {
+      method: "POST",
+      body: JSON.stringify({ riff: "nope" }),
+    });
+    expect(missing.status).toBe(422);
+
+    const out = await cli([
+      "render",
+      "--board",
+      "default",
+      "--riff",
+      "clean-arpeggio",
+      "--out",
+      "riff.wav",
+      "--json",
+    ]);
+    expect(out.code).toBe(EXIT.ok);
+    expect(decodeWav(readFileSync(join(dir, "riff.wav"))).samples.length).toBe(a.frames);
+  });
+});

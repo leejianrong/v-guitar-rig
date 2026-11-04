@@ -1,5 +1,5 @@
-import { MODULES, type ModuleInfo, STARTER_PRESETS } from "@rig/dsp-host";
-import type { Preset, Slot } from "@rig/shared";
+import { MODULES, type ModuleInfo, STARTER_PRESETS, STARTER_RIFFS } from "@rig/dsp-host";
+import type { Preset, Riff, Slot } from "@rig/shared";
 import { useEffect, useState } from "react";
 
 /** Every module the page can show by id. Built-ins carry code; stored modules are metadata only. */
@@ -46,24 +46,30 @@ export function useCatalog(connected: boolean, tick: number) {
   return { catalog: { ...BUILTIN, ...stored.catalog }, sources: stored.sources };
 }
 
-/** The shipped presets, plus the daemon's own list (which has them too, and the user's) when connected. */
-export function usePresets(connected: boolean, tick: number): Preset[] {
-  const [presets, setPresets] = useState<Preset[]>(STARTER_PRESETS);
+/** A list the daemon keeps (`GET /api/<name>` answers `{ <name>: [...] }`): the shipped items until it is reachable. */
+function useDaemonList<T>(name: string, shipped: T[], connected: boolean, tick: number): T[] {
+  const [items, setItems] = useState<T[]>(shipped);
   // biome-ignore lint/correctness/useExhaustiveDependencies: `tick` is the trigger to fetch again
   useEffect(() => {
     const token = document.querySelector<HTMLMetaElement>('meta[name="rig-token"]')?.content;
     if (!connected || !token) return;
     let live = true;
-    fetch("/api/presets", { headers: { authorization: `Bearer ${token}` } })
+    fetch(`/api/${name}`, { headers: { authorization: `Bearer ${token}` } })
       .then((r) => r.json())
-      .then((body: { presets: Preset[] }) => live && setPresets(body.presets))
+      .then((body: Record<string, T[]>) => live && setItems(body[name] as T[]))
       .catch(() => {}); // keep the list we have
     return () => {
       live = false;
     };
-  }, [connected, tick]);
-  return presets;
+  }, [name, connected, tick]);
+  return items;
 }
+
+export const usePresets = (connected: boolean, tick: number) =>
+  useDaemonList<Preset>("presets", STARTER_PRESETS, connected, tick);
+
+export const useRiffs = (connected: boolean, tick: number) =>
+  useDaemonList<Riff>("riffs", STARTER_RIFFS, connected, tick);
 
 /** Modules a preset uses that this page cannot show, so loading it would leave holes. */
 export const missingModules = (preset: Preset, catalog: Catalog): string[] => [

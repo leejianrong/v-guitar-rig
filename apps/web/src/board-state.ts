@@ -81,7 +81,11 @@ export function useBoard() {
             const lines = buf.slice(0, i).split("\n");
             const line = lines.find((l) => l.startsWith("data: "));
             buf = buf.slice(i + 2);
-            if (lines.includes("event: modules") || lines.includes("event: presets")) {
+            if (
+              lines.includes("event: modules") ||
+              lines.includes("event: presets") ||
+              lines.includes("event: riffs")
+            ) {
               setChangeTick((t) => t + 1);
               continue;
             }

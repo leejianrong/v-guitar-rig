@@ -3,7 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
-import { applyTone } from "@rig/shared";
+import { applyTone, TAB_EXAMPLE } from "@rig/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { type Running, startServer } from "./server";
 
@@ -186,6 +186,25 @@ describe("MCP server", () => {
     const r = await tool("search_presets", { query: "heavy metal riffs" });
     expect(r.isError).toBe(false);
     expect(r.json().hits[0].id).toBe("iron-wall");
+  });
+
+  it("writes a riff as tab, reads it back, and hears it through a board", async () => {
+    const saved = await tool("set_riff", {
+      id: "mcp-riff",
+      name: "MCP riff",
+      bpm: 100,
+      tab: TAB_EXAMPLE,
+    });
+    expect(saved.isError).toBe(false);
+    const got = (await tool("get_riff", { id: "mcp-riff" })).json();
+    expect(got.beats).toBe(4);
+    expect(got.notes.map((n: { string: number }) => n.string)).toContain(6);
+    const heard = (await tool("render", { board: "default", riff: "mcp-riff" })).json();
+    expect(heard.peak).toBeGreaterThan(0.05);
+    expect(heard.frames).toBe(Math.round(((4 * 60) / 100 + 1.5) * 48000));
+    const bad = await tool("set_riff", { id: "bad-riff", tab: "e|5x|" });
+    expect(bad.isError).toBe(true);
+    expect(bad.text).toContain("6 lines");
   });
 
   it("returns a stale rev as a tool error the model can act on", async () => {

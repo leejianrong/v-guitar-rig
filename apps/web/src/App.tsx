@@ -1,9 +1,8 @@
 import type { Fault } from "@rig/dsp-host";
-import { STARTER_RIFFS } from "@rig/dsp-host";
 import { useEffect, useRef, useState } from "react";
 import { benchmarkHeadroom, loadWasm, Rig, type Source } from "./audio";
 import { useBoard } from "./board-state";
-import { missingModules, slotsOf, useCatalog, usePresets } from "./catalog";
+import { missingModules, slotsOf, useCatalog, usePresets, useRiffs } from "./catalog";
 import { FrameCounter } from "./frames";
 import { renderOffline } from "./offline";
 import { Board, tapLabel } from "./ui/Board";
@@ -15,10 +14,11 @@ export function App() {
   const { board, link, notice, changeTick, dismissNotice, edit } = useBoard();
   const { catalog, sources } = useCatalog(link === "connected", changeTick);
   const presets = usePresets(link === "connected", changeTick);
+  const riffs = useRiffs(link === "connected", changeTick);
   const [blocked, setBlocked] = useState<string | null>(null);
   const [rig, setRig] = useState<Rig | null>(null);
   const [source, setSource] = useState<Source>("tone");
-  const [riffId, setRiffId] = useState(STARTER_RIFFS[0]?.id ?? "");
+  const [riffId, setRiffId] = useState("pentatonic-lick");
   const [playing, setPlaying] = useState(false);
   const [level, setLevel] = useState(0.9);
   const [volume, setVolume] = useState(0.8);
@@ -45,9 +45,12 @@ export function App() {
   const inspected = slots.findIndex((s) => s.id === selectedId);
   useEffect(() => rig?.inspect(inspected), [rig, inspected]);
   useEffect(() => rig?.setLevel(level), [rig, level]);
+  const riff = riffs.find((r) => r.id === riffId);
+  // restart only when the chosen riff itself changes, not whenever the list is fetched again
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `riff` is read through its id and rev
   useEffect(() => {
-    rig?.playRiff(playing ? (STARTER_RIFFS.find((r) => r.id === riffId) ?? null) : null);
-  }, [rig, riffId, playing]);
+    rig?.playRiff(playing && riff ? riff : null);
+  }, [rig, riff?.id, riff?.rev, playing]);
   useEffect(() => rig?.setVolume(volume), [rig, volume]);
   useEffect(() => {
     if (!rig) return;
@@ -126,7 +129,7 @@ export function App() {
             <label>
               Riff
               <select value={riffId} onChange={(e) => setRiffId(e.target.value)}>
-                {STARTER_RIFFS.map((r) => (
+                {riffs.map((r) => (
                   <option key={r.id} value={r.id}>
                     {r.name}
                   </option>
