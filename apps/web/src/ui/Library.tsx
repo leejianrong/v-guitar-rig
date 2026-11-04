@@ -1,4 +1,4 @@
-import { MODULES } from "@rig/dsp-host";
+import type { Catalog } from "../catalog";
 import { finishFor } from "./finish";
 
 /** A miniature of the pedal as it looks on the board: same enamel, legend, knob count and footswitch. */
@@ -22,12 +22,18 @@ function Thumb({ id, name, knobs }: { id: string; name: string; knobs: number })
   );
 }
 
-export function Library({ onAdd }: { onAdd: (moduleId: string) => void }) {
+export function Library({
+  catalog,
+  onAdd,
+}: {
+  catalog: Catalog;
+  onAdd: (moduleId: string) => void;
+}) {
   return (
     <aside className="shelf" aria-label="Pedal shelf">
       <h2>Shelf</h2>
       <ul>
-        {Object.values(MODULES).map((m) => (
+        {Object.values(catalog).map((m) => (
           <li key={m.id}>
             <button
               type="button"

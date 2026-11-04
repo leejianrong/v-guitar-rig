@@ -17,13 +17,17 @@ export type Visual =
   /** A delay time swept sinusoidally between `minMs` and `maxMs`, `rateHz` times a second. */
   | { kind: "sweep"; rateHz: number; minMs: number; maxMs: number };
 
-export interface ModuleDef {
+/** What the UI needs to show a module. Stored modules arrive as this alone: their code never runs on the page. */
+export interface ModuleInfo {
   id: string;
   name: string;
   category: "drive" | "time" | "mod" | "dynamics";
   description: string;
   params: ParamSpec[];
   visual?(params: Readonly<Record<string, number>>): Visual;
+}
+
+export interface ModuleDef extends ModuleInfo {
   create(sampleRate: number, wasm: WebAssembly.Module): Processor;
 }
 

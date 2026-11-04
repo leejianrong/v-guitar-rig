@@ -1,10 +1,11 @@
 import type { Fault } from "@rig/dsp-host";
-import { MODULES } from "@rig/dsp-host";
 import type { Slot } from "@rig/shared";
 import { Fragment, useRef } from "react";
+import type { Catalog } from "../catalog";
 import { Pedal } from "./Pedal";
 
 interface Props {
+  catalog: Catalog;
   slots: Slot[];
   faults: Fault[];
   tap: number;
@@ -23,25 +24,27 @@ const move = (s: Slot[], from: number, to: number): Slot[] => {
 };
 
 /** Where in the chain a cable sits: the jack on it chooses which signal the scope shows. */
-export const tapLabel = (slots: Slot[], i: number) =>
+export const tapLabel = (catalog: Catalog, slots: Slot[], i: number) =>
   i === 0
     ? "Input"
     : i >= slots.length
       ? "Output"
-      : `After ${MODULES[slots[i - 1]?.module ?? ""]?.name ?? "pedal"}`;
+      : `After ${catalog[slots[i - 1]?.module ?? ""]?.name ?? "pedal"}`;
 
 function Jack({
+  catalog,
   index,
   slots,
   tap,
   onTap,
 }: {
+  catalog: Catalog;
   index: number;
   slots: Slot[];
   tap: number;
   onTap: (i: number) => void;
 }) {
-  const label = tapLabel(slots, index);
+  const label = tapLabel(catalog, slots, index);
   return (
     <div className="cable">
       <button
@@ -57,7 +60,7 @@ function Jack({
   );
 }
 
-export function Board({ slots, faults, tap, selected, onSelect, onTap, edit }: Props) {
+export function Board({ catalog, slots, faults, tap, selected, onSelect, onTap, edit }: Props) {
   const dragFrom = useRef<number | null>(null);
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: mouse shortcut; the Inspect button is the keyboard route
@@ -66,9 +69,9 @@ export function Board({ slots, faults, tap, selected, onSelect, onTap, edit }: P
       aria-label="Pedalboard"
       onClick={(e) => e.target === e.currentTarget && onSelect(null)}
     >
-      <Jack index={0} slots={slots} tap={tap} onTap={onTap} />
+      <Jack catalog={catalog} index={0} slots={slots} tap={tap} onTap={onTap} />
       {slots.map((slot, i) => {
-        const def = MODULES[slot.module];
+        const def = catalog[slot.module];
         if (!def) return null;
         return (
           <Fragment key={slot.id}>
@@ -103,7 +106,7 @@ export function Board({ slots, faults, tap, selected, onSelect, onTap, edit }: P
                 },
               }}
             />
-            <Jack index={i + 1} slots={slots} tap={tap} onTap={onTap} />
+            <Jack catalog={catalog} index={i + 1} slots={slots} tap={tap} onTap={onTap} />
           </Fragment>
         );
       })}

@@ -1,7 +1,8 @@
 import {
   type CurvePoint,
   levelNear,
-  type ModuleDef,
+  MODULES,
+  type ModuleInfo,
   measureResponse,
   measureTransfer,
   powerDb,
@@ -215,7 +216,7 @@ function drawResponse(c: HTMLCanvasElement, curve: ResponsePoint[]) {
 }
 
 /** What the selected pedal is doing to the signal. */
-export function Inspector({ def, slot, rig }: { def: ModuleDef; slot: Slot; rig: Rig | null }) {
+export function Inspector({ def, slot, rig }: { def: ModuleInfo; slot: Slot; rig: Rig | null }) {
   const spec = useRef<HTMLCanvasElement>(null);
   const env = useRef<HTMLCanvasElement>(null);
   const gain = useRef<HTMLOutputElement>(null);
@@ -229,12 +230,15 @@ export function Inspector({ def, slot, rig }: { def: ModuleDef; slot: Slot; rig:
   const visual = def.visual?.(
     Object.fromEntries(def.params.map((s) => [s.id, slot.params[s.id] ?? s.default])),
   );
+  // A stored module's code runs only in the audio worklet, so there is nothing to measure on the page.
+  const code = MODULES[def.id];
   useEffect(() => {
+    if (!code) return;
     let live = true;
     const t = setTimeout(async () => {
       const [wasm, now] = [await loadWasm(), JSON.parse(params)];
-      const curve = measureTransfer(def, wasm, now);
-      const response = measureResponse(def, wasm, now);
+      const curve = measureTransfer(code, wasm, now);
+      const response = measureResponse(code, wasm, now);
       const [first, last] = [curve[0], curve[curve.length - 1]];
       if (!live || !first || !last || !curveCanvas.current || !respCanvas.current) return;
       drawCurve(curveCanvas.current, curve);
@@ -255,7 +259,7 @@ export function Inspector({ def, slot, rig }: { def: ModuleDef; slot: Slot; rig:
       live = false;
       clearTimeout(t);
     };
-  }, [def, params]);
+  }, [code, params]);
   useEffect(() => {
     latest = null;
     if (!rig) return;
@@ -287,29 +291,38 @@ export function Inspector({ def, slot, rig }: { def: ModuleDef; slot: Slot; rig:
         </figcaption>
       </figure>
       {visual && <VisualView visual={visual} />}
-      <figure className="half">
-        <canvas
-          ref={curveCanvas}
-          width={CURVE}
-          height={CURVE}
-          className="curve"
-          aria-label="Transfer curve: level out against level in"
-        />
-        <figcaption data-testid="curve-summary">
-          measured transfer curve (dashed: a plain wire) · {summary}
-        </figcaption>
-      </figure>
-      <figure className="half">
-        <canvas
-          ref={respCanvas}
-          width={RESP_W}
-          height={RESP_H}
-          aria-label="Frequency response at a small signal level"
-        />
-        <figcaption data-testid="response-summary">
-          measured frequency response, quiet signal · {rolloff}
-        </figcaption>
-      </figure>
+      {code ? (
+        <>
+          <figure className="half">
+            <canvas
+              ref={curveCanvas}
+              width={CURVE}
+              height={CURVE}
+              className="curve"
+              aria-label="Transfer curve: level out against level in"
+            />
+            <figcaption data-testid="curve-summary">
+              measured transfer curve (dashed: a plain wire) · {summary}
+            </figcaption>
+          </figure>
+          <figure className="half">
+            <canvas
+              ref={respCanvas}
+              width={RESP_W}
+              height={RESP_H}
+              aria-label="Frequency response at a small signal level"
+            />
+            <figcaption data-testid="response-summary">
+              measured frequency response, quiet signal · {rolloff}
+            </figcaption>
+          </figure>
+        </>
+      ) : (
+        <p className="note" data-testid="no-probe">
+          Transfer curve and frequency response are measured for built-in pedals only. This one runs
+          in the audio engine, not on the page.
+        </p>
+      )}
       <figure>
         <canvas ref={env} width={W} height={ENV_H} aria-label="Level over time, in and out" />
         <figcaption>

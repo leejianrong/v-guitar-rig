@@ -1,7 +1,8 @@
-import { type Fault, MODULES } from "@rig/dsp-host";
+import type { Fault } from "@rig/dsp-host";
 import { useEffect, useRef, useState } from "react";
 import { benchmarkHeadroom, loadWasm, Rig, type Source } from "./audio";
 import { useBoard } from "./board-state";
+import { useCatalog } from "./catalog";
 import { FrameCounter } from "./frames";
 import { renderOffline } from "./offline";
 import { Board, tapLabel } from "./ui/Board";
@@ -10,7 +11,8 @@ import { Library } from "./ui/Library";
 import { levelAt, Scope } from "./ui/Scope";
 
 export function App() {
-  const { board, link, notice, dismissNotice, edit } = useBoard();
+  const { board, link, notice, modulesTick, dismissNotice, edit } = useBoard();
+  const { catalog, sources } = useCatalog(link === "connected", modulesTick);
   const [rig, setRig] = useState<Rig | null>(null);
   const [source, setSource] = useState<Source>("tone");
   const [level, setLevel] = useState(0.9);
@@ -28,9 +30,11 @@ export function App() {
   const [selectedId, select] = useState<string | null>(null);
   const slots = board.slots;
   const selectedSlot = slots.find((s) => s.id === selectedId);
-  const selectedDef = MODULES[selectedSlot?.module ?? ""];
+  const selectedDef = catalog[selectedSlot?.module ?? ""];
   const tapAt = Math.min(tap, slots.length);
 
+  // modules before slots, so a board that uses a stored module finds it compiled
+  useEffect(() => rig?.setModules(sources), [rig, sources]);
   useEffect(() => rig?.setSlots(slots), [rig, slots]);
   useEffect(() => rig?.selectTap(tapAt), [rig, tapAt]);
   const inspected = slots.findIndex((s) => s.id === selectedId);
@@ -73,7 +77,7 @@ export function App() {
   async function start() {
     setStatus("Starting audio...");
     try {
-      const r = await Rig.start(source, slots, level, volume);
+      const r = await Rig.start(source, slots, sources, level, volume);
       setRig(r);
       setStatus("Running");
       const h = await benchmarkHeadroom();
@@ -152,12 +156,14 @@ export function App() {
 
       <div className="stage">
         <Library
+          catalog={catalog}
           onAdd={(id) =>
             edit((s) => [...s, { id: crypto.randomUUID(), module: id, bypass: false, params: {} }])
           }
         />
         <div className="work">
           <Board
+            catalog={catalog}
             slots={slots}
             faults={faults}
             tap={tapAt}
@@ -169,7 +175,7 @@ export function App() {
           {selectedDef && selectedSlot && (
             <Inspector def={selectedDef} slot={selectedSlot} rig={rig} />
           )}
-          <Scope rig={rig} label={tapLabel(slots, tapAt)} />
+          <Scope rig={rig} label={tapLabel(catalog, slots, tapAt)} />
         </div>
       </div>
       <footer className="engine">
