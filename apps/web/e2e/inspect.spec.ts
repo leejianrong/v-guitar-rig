@@ -131,3 +131,39 @@ test("frequency response is measured and turning Tone moves the cutoff", async (
     path: "test-results/response.png",
   });
 });
+
+test("delay draws its echo taps and moves them with Time; chorus draws its sweep", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Add Delay to the board" }).click();
+  await page.getByRole("button", { name: "Add Chorus to the board" }).click();
+  const delay = page.getByTestId("pedal-delay@1");
+  await delay.getByRole("heading").click();
+
+  const taps = () =>
+    page
+      .getByTestId("echo-tap")
+      .evaluateAll((els) => els.map((e) => Number(e.getAttribute("data-ms"))));
+  const first = await taps();
+  expect(first.slice(0, 2)).toEqual([380, 760]);
+
+  await delay.getByRole("slider", { name: "Time" }).focus();
+  await page.keyboard.press("End"); // 1 s
+  await expect.poll(async () => (await taps())[0]).toBe(1000);
+  await page
+    .getByRole("region", { name: "Pedal inspector" })
+    .screenshot({ path: "test-results/echoes.png" });
+
+  const chorus = page.getByTestId("pedal-chorus@1");
+  await chorus.getByRole("heading").click();
+  await expect(page.getByTestId("echo-tap")).toHaveCount(0);
+  await expect(page.getByTestId("sweep")).toHaveAttribute("data-rate", "0.8");
+  await chorus.getByRole("slider", { name: "Rate" }).focus();
+  await page.keyboard.press("End"); // 8 Hz
+  await expect(page.getByTestId("sweep")).toHaveAttribute("data-rate", "8");
+  await expect(page.getByTestId("visual-caption")).toContainText("8.0 times a second");
+  await page
+    .getByRole("region", { name: "Pedal inspector" })
+    .screenshot({ path: "test-results/sweep.png" });
+});

@@ -12,6 +12,7 @@ import type { Slot } from "@rig/shared";
 import { useEffect, useRef, useState } from "react";
 import { loadWasm, type Pair, type Rig } from "../audio";
 import { Envelope, toDb } from "../envelope";
+import { VisualView } from "./Visuals";
 
 const F_MIN = 40;
 const F_MAX = 16000;
@@ -224,6 +225,9 @@ export function Inspector({ def, slot, rig }: { def: ModuleDef; slot: Slot; rig:
 
   // Measured on a copy of the module, a moment after the last knob move, so it never touches the live one.
   const params = JSON.stringify(slot.params);
+  const visual = def.visual?.(
+    Object.fromEntries(def.params.map((s) => [s.id, slot.params[s.id] ?? s.default])),
+  );
   useEffect(() => {
     let live = true;
     const t = setTimeout(async () => {
@@ -281,6 +285,7 @@ export function Inspector({ def, slot, rig }: { def: ModuleDef; slot: Slot; rig:
           <i className="key before" /> in <i className="key after" /> out
         </figcaption>
       </figure>
+      {visual && <VisualView visual={visual} />}
       <figure>
         <canvas
           ref={curveCanvas}
