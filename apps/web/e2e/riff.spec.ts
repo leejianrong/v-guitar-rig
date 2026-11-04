@@ -68,3 +68,23 @@ test("a riff typed into the tab editor is heard, edits are heard while it plays,
     .poll(() => page.evaluate(() => window.__rig?.level(659) ?? 0), { timeout: 15_000 })
     .toBeLessThan(-80);
 });
+
+test("a riff can be authored with the mouse alone, and the selected cell is visible", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByLabel("Source").selectOption("riff");
+  await page.getByRole("button", { name: "New riff" }).click();
+  await expect(page.getByText("Empty: click a cell")).toBeVisible();
+
+  const cell = page.getByRole("button", { name: /^String 5, step 3(:|$)/ });
+  await cell.click();
+  await expect(cell).toHaveClass(/sel/);
+  await page.getByLabel("Fret").fill("7");
+  await expect(cell).toContainText("7");
+  await page.getByLabel("Technique").selectOption("bend");
+  await expect(cell).toContainText("↑1");
+  await page.getByRole("button", { name: "Clear note" }).click();
+  await expect(cell).not.toContainText("7");
+  await expect(page.getByText("Empty: click a cell")).toBeVisible();
+});

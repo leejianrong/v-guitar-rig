@@ -684,7 +684,8 @@ select {
 .cell:hover:not(:disabled) {
   background-color: #1d2227;
 }
-.cell:focus-visible {
+.cell.sel {
+  outline: 2px solid var(--signal);
   outline-offset: -2px;
   background-color: #2a2210;
 }
@@ -693,8 +694,14 @@ select {
   padding: 1px 3px;
   border-radius: 3px;
 }
-.cell:focus-visible span {
+.cell.sel span {
   background: #2a2210;
+}
+.cellbar .cellname {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--signal);
+  min-width: 11ch;
 }
 .playhead {
   position: absolute;

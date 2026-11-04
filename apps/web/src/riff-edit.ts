@@ -38,9 +38,25 @@ export function setFret(
 export const clearCell = (riff: Riff, string: number, slot: number, step: number): Riff =>
   withNotes(riff, without(riff, string, slot, step), step);
 
+/** Set (or with no `tech`, remove) the technique of the note in a cell; nothing happens in an empty cell. */
+export function setTech(
+  riff: Riff,
+  string: number,
+  slot: number,
+  step: number,
+  tech?: Technique,
+  bend = 1,
+): Riff {
+  const old = noteAt(riff, string, slot, step);
+  if (!old) return riff;
+  const { tech: _t, bend: _b, ...rest } = old;
+  const next: RiffNote = tech ? { ...rest, tech, ...(tech === "bend" && { bend }) } : rest;
+  return withNotes(riff, [...without(riff, string, slot, step), next], step);
+}
+
 /**
- * Mark the note in a cell with `tech`, or take the mark off if it already has it. A bend goes one
- * semitone, then two, then off.
+ * The key shortcut: mark the note with `tech`, or take the mark off if it already has it. A bend goes
+ * one semitone, then two, then off.
  */
 export function toggleTech(
   riff: Riff,
@@ -51,17 +67,12 @@ export function toggleTech(
 ): Riff {
   const old = noteAt(riff, string, slot, step);
   if (!old) return riff;
-  const { tech: had, bend, ...rest } = old;
-  let next: RiffNote = rest;
-  if (tech === "bend")
-    next =
-      had === "bend" && (bend ?? 1) < 2
-        ? { ...rest, tech, bend: 2 }
-        : had === "bend"
-          ? rest
-          : { ...rest, tech, bend: 1 };
-  else if (had !== tech) next = { ...rest, tech };
-  return withNotes(riff, [...without(riff, string, slot, step), next], step);
+  if (tech !== "bend")
+    return setTech(riff, string, slot, step, old.tech === tech ? undefined : tech);
+  if (old.tech !== "bend") return setTech(riff, string, slot, step, "bend", 1);
+  return (old.bend ?? 1) < 2
+    ? setTech(riff, string, slot, step, "bend", 2)
+    : setTech(riff, string, slot, step);
 }
 
 /** Change the length of one pass; notes that no longer fit are dropped. */
