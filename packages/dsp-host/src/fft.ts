@@ -1,3 +1,59 @@
+/** In-place radix-2 complex FFT of a fixed power-of-two size, with tables built once (safe for an audio callback). */
+export class Fft {
+  private readonly rev: Uint32Array;
+  private readonly cos: Float64Array;
+  private readonly sin: Float64Array;
+  constructor(readonly n: number) {
+    this.rev = new Uint32Array(n);
+    for (let i = 1, j = 0; i < n; i++) {
+      let bit = n >> 1;
+      for (; j & bit; bit >>= 1) j ^= bit;
+      j ^= bit;
+      this.rev[i] = j;
+    }
+    this.cos = Float64Array.from({ length: n / 2 }, (_, k) => Math.cos((-2 * Math.PI * k) / n));
+    this.sin = Float64Array.from({ length: n / 2 }, (_, k) => Math.sin((-2 * Math.PI * k) / n));
+  }
+
+  forward(re: Float64Array, im: Float64Array): void {
+    const { n, rev } = this;
+    for (let i = 1; i < n; i++) {
+      const j = rev[i] as number;
+      if (i < j) {
+        [re[i], re[j]] = [re[j] as number, re[i] as number];
+        [im[i], im[j]] = [im[j] as number, im[i] as number];
+      }
+    }
+    for (let len = 2; len <= n; len <<= 1) {
+      const step = n / len;
+      for (let i = 0; i < n; i += len) {
+        for (let k = 0; k < len / 2; k++) {
+          const c = this.cos[k * step] as number;
+          const s = this.sin[k * step] as number;
+          const a = i + k;
+          const b = a + len / 2;
+          const tr = (re[b] as number) * c - (im[b] as number) * s;
+          const ti = (re[b] as number) * s + (im[b] as number) * c;
+          re[b] = (re[a] as number) - tr;
+          im[b] = (im[a] as number) - ti;
+          re[a] = (re[a] as number) + tr;
+          im[a] = (im[a] as number) + ti;
+        }
+      }
+    }
+  }
+
+  /** Inverse transform, scaled so that `inverse(forward(x))` returns x. */
+  inverse(re: Float64Array, im: Float64Array): void {
+    for (let i = 0; i < this.n; i++) im[i] = -(im[i] as number);
+    this.forward(re, im);
+    for (let i = 0; i < this.n; i++) {
+      re[i] = (re[i] as number) / this.n;
+      im[i] = -(im[i] as number) / this.n;
+    }
+  }
+}
+
 /** Power spectrum in dB of a Hann-windowed frame, using an in-place radix-2 FFT. N must be a power of two. */
 export function powerDb(frame: Float32Array): Float32Array {
   const n = frame.length;
@@ -9,29 +65,7 @@ export function powerDb(frame: Float32Array): Float32Array {
     re[i] = (frame[i] ?? 0) * w;
     wsum += w;
   }
-  for (let i = 1, j = 0; i < n; i++) {
-    let bit = n >> 1;
-    for (; j & bit; bit >>= 1) j ^= bit;
-    j ^= bit;
-    if (i < j) [re[i], re[j]] = [re[j] as number, re[i] as number];
-  }
-  for (let len = 2; len <= n; len <<= 1) {
-    const ang = (-2 * Math.PI) / len;
-    for (let i = 0; i < n; i += len) {
-      for (let k = 0; k < len / 2; k++) {
-        const c = Math.cos(ang * k);
-        const s = Math.sin(ang * k);
-        const a = i + k;
-        const b = a + len / 2;
-        const tr = (re[b] as number) * c - (im[b] as number) * s;
-        const ti = (re[b] as number) * s + (im[b] as number) * c;
-        re[b] = (re[a] as number) - tr;
-        im[b] = (im[a] as number) - ti;
-        re[a] = (re[a] as number) + tr;
-        im[a] = (im[a] as number) + ti;
-      }
-    }
-  }
+  new Fft(n).forward(re, im);
   // amplitude of a full-scale sine reads 0 dB
   const out = new Float32Array(n / 2);
   for (let i = 0; i < n / 2; i++) {
