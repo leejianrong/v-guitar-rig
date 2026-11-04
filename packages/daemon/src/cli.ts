@@ -1,7 +1,14 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { ModuleError } from "@rig/dsp-host";
-import { type Board, type Preset, testClip, validateBoard } from "@rig/shared";
+import { ModuleError, renderRiff } from "@rig/dsp-host";
+import {
+  type Board,
+  type Preset,
+  type Riff,
+  testClip,
+  validateBoard,
+  validateRiff,
+} from "@rig/shared";
 import { daemonClient } from "./client";
 import { runMcp } from "./mcp";
 import { renderAny } from "./render";
@@ -48,13 +55,14 @@ export function exitCodeFor(e: unknown): number {
 const USAGE = `rig: virtual guitar rig
 
   rig serve  [--rig-dir DIR] [--port N] [--host H] [--web-dir DIR]
-  rig render --board FILE|ID [--input FILE.wav|test] [--seconds N] --out FILE.wav [--rig-dir DIR] [--json]
+  rig render --board FILE|ID [--input FILE.wav|test | --riff ID|FILE.json] [--seconds N] --out FILE.wav [--rig-dir DIR] [--json]
   rig board get ID [--json]            talk to a running daemon (--url, token from RIG_TOKEN or <rig-dir>/.rig/token)
   rig board set FILE [--expected-rev N] [--json]
   rig module new FILE.js [--expected-rev N]   add a generated module (checked in the sandbox first)
   rig module check ID                         re-run the safety gate on a stored module
   rig module list
   rig preset list | get ID | search WORDS... | new FILE.json [--expected-rev N]   presets (a board plus tags)
+  rig riff list | get ID | new FILE.json | new FILE.txt --id ID [--name N --bpm N --step BEATS]   riffs the virtual guitar plays (JSON, or ASCII tab)
   rig mcp [--url URL] [--rig-dir DIR]          MCP server on stdio for an LLM client (needs a running daemon)
 
 Exit codes: 0 ok, 1 error, 2 validation, 3 stale rev, 4 module failure.`;
@@ -120,7 +128,19 @@ export async function runCli(argv: string[], io: Io): Promise<number> {
       const inputArg = str("input") ?? "test";
       let input: Float32Array;
       let sampleRate = 48000;
-      if (inputArg === "test") input = testClip(Math.round(Number(str("seconds") ?? 5) * 48000));
+      if (str("riff")) {
+        const given = str("riff") as string;
+        const store = new RigStore(rigDir);
+        const v = given.endsWith(".json")
+          ? validateRiff(JSON.parse(readFileSync(resolve(io.cwd, given), "utf8")))
+          : { ok: true as const, riff: store.getRiff(given) as Riff };
+        if (!v.ok || !v.riff) {
+          io.err(`invalid riff: ${v.ok ? `no riff '${given}'` : v.errors.join("; ")}\n`);
+          return EXIT.validation;
+        }
+        input = renderRiff(v.riff, 48000, 1.5);
+      } else if (inputArg === "test")
+        input = testClip(Math.round(Number(str("seconds") ?? 5) * 48000));
       else {
         const w = decodeWav(readFileSync(resolve(io.cwd, inputArg)));
         input = w.samples;
@@ -157,7 +177,8 @@ export async function runCli(argv: string[], io: Io): Promise<number> {
     if (
       (cmd === "board" && (sub === "get" || sub === "set")) ||
       cmd === "module" ||
-      cmd === "preset"
+      cmd === "preset" ||
+      cmd === "riff"
     ) {
       const call = daemonClient(
         str("url") ?? io.env.RIG_URL ?? "http://127.0.0.1:7878",
@@ -191,6 +212,27 @@ export async function runCli(argv: string[], io: Io): Promise<number> {
           expectedRev: rev === undefined ? 0 : Number(rev),
           preset,
         });
+      } else if (cmd === "riff" && sub === "list") {
+        res = await call("GET", "/api/riffs");
+      } else if (cmd === "riff" && sub === "get") {
+        res = await call("GET", `/api/riffs/${need("a riff id", pos[2])}`);
+      } else if (cmd === "riff" && sub === "new") {
+        const file = need("a riff file", pos[2]);
+        const text = readFileSync(resolve(io.cwd, file), "utf8");
+        const rev = str("expected-rev") === undefined ? 0 : Number(str("expected-rev"));
+        if (file.endsWith(".json")) {
+          const riff = JSON.parse(text) as Riff;
+          res = await call("PUT", `/api/riffs/${riff.id}`, { expectedRev: rev, riff });
+        } else {
+          const id = need("--id for a tab file", str("id"));
+          const tab = {
+            tab: text,
+            name: str("name"),
+            bpm: str("bpm") && Number(str("bpm")),
+            step: str("step") && Number(str("step")),
+          };
+          res = await call("PUT", `/api/riffs/${id}`, { expectedRev: rev, tab });
+        }
       } else if (cmd === "board") {
         const board = JSON.parse(
           readFileSync(resolve(io.cwd, need("a board file", pos[2])), "utf8"),

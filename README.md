@@ -45,8 +45,9 @@ Live audio always runs in your browser; Docker cannot reach a Windows sound card
    ```
    The browser worklet and this renderer agree to within 1e-5 (measured: exactly equal on a 5 s clip).
 4. To add a generated pedal, write its source (the format is documented at the top of `packages/dsp-host/src/compile.ts`; ADR-0004 describes the sandbox it runs in) and `rig module new my-pedal.js` against the running daemon; it is checked in a sandbox before it is kept, and `rig module list` / `rig module check ID` show and re-check what is stored. Stored modules render offline and return descriptors (`rig render --json`), and play in the browser as soon as they are stored.
-5. To let your own LLM do this, point an MCP client at `node packages/daemon/dist/rig.mjs mcp` (stdio; set `RIG_URL` and `RIG_TOKEN`, or `--rig-dir` to read the token). It offers tools to list, add and check modules, get and set boards, and render with descriptors, plus a `build-a-pedal` prompt that explains the module format and the loop.
-6. For round-trip latency, connect your interface output to an input with a cable and press **Measure loopback latency**.
+5. To let your own LLM do this, point an MCP client at `node packages/daemon/dist/rig.mjs mcp` (stdio; set `RIG_URL` and `RIG_TOKEN`, or `--rig-dir` to read the token). It offers tools to list, add and check modules, get and set boards and presets, write riffs, and render with descriptors, plus prompts that explain the module format and the loop.
+6. To test a tone on a riff instead of the test tone, choose **Virtual guitar (riff)** as the source: a plucked-string guitar plays the riff you pick. Add your own with `rig riff new FILE.json`, or ASCII tab with `rig riff new lick.txt --id lick --bpm 100`; `rig render --riff ID` and the MCP `render` tool play a riff through a board offline, and `set_riff` lets an LLM write one.
+7. For round-trip latency, connect your interface output to an input with a cable and press **Measure loopback latency**.
 
 The measured CPU headroom on the author's machine is about 13x per 128-frame block; hardware latency numbers are not recorded yet ([docs/hardware-checks.md](docs/hardware-checks.md)).
 

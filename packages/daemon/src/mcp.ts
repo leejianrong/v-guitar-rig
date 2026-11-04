@@ -1,5 +1,5 @@
 import { createInterface } from "node:readline";
-import { TONE_RULES } from "@rig/shared";
+import { TAB_EXAMPLE, TONE_RULES } from "@rig/shared";
 import type { Reply } from "./client";
 
 type Call = (method: string, path: string, body?: unknown) => Promise<Reply>;
@@ -135,15 +135,50 @@ const TOOLS = [
     inputSchema: obj({ preset: { type: "object" }, expectedRev: { type: "number" } }, ["preset"]),
   },
   {
+    name: "list_riffs",
+    description:
+      "Riffs the virtual guitar can play: notes with string (1 = high e to 6 = low E), fret, start and length in beats, and techniques.",
+    inputSchema: obj({}),
+  },
+  {
+    name: "get_riff",
+    description: "One riff with its notes.",
+    inputSchema: obj({ id: str("riff id") }, ["id"]),
+  },
+  {
+    name: "set_riff",
+    description: `Save a riff for the virtual guitar to play. Either pass riff (the full object: schema 1, id, name, bpm, beats, notes [{string, fret, at, length, tech?, bend?}], rev) or write ASCII tab in tab with id, name and bpm. Tab is 6 lines, high e first, like
+
+${TAB_EXAMPLE}
+
+Notes line up by the column of their first digit, one step each (a half beat unless you set step, e.g. 0.25 for sixteenths). Marks take no time: h hammer-on, p pull-off, / slide, 7b9 bend 7 up to 9, 0m palm mute, and the second digit of 12. Where one string has a mark, pad the other strings with - so first digits stay lined up, as above. Read the notes back with get_riff to check the timing. expectedRev is 0 for a new riff, else its current rev.`,
+    inputSchema: obj(
+      {
+        riff: { type: "object" },
+        tab: { type: "string", description: "ASCII tab, used instead of riff" },
+        id: str("riff id, for tab"),
+        name: str("display name, for tab"),
+        bpm: { type: "number" },
+        step: { type: "number", description: "beats per tab column, default 0.5" },
+        expectedRev: { type: "number" },
+      },
+      [],
+    ),
+  },
+  {
     name: "render",
     description:
-      "Render a board over a guitar-like test clip and return level, peak and descriptors: rmsDb, peakDb, crestDb, centroidHz, rolloffHz, bandsDb, thdPercent, tailMs.",
+      "Render a board over a guitar-like test clip, or over a riff, and return level, peak and descriptors: rmsDb, peakDb, crestDb, centroidHz, rolloffHz, bandsDb, thdPercent, tailMs.",
     inputSchema: obj({
       board: {
         description:
           'a saved board id (default "default"), or a whole board object to try without saving it',
       },
-      seconds: { type: "number", description: "0.1 to 30, default 2" },
+      riff: {
+        description:
+          "play this through the board instead of the test clip: a saved riff id, a whole riff, or {tab, bpm, ...} to try ASCII tab without saving",
+      },
+      seconds: { type: "number", description: "0.1 to 30, default 2; ignored for a riff" },
     }),
   },
 ];
@@ -183,8 +218,25 @@ const route = (name: string, a: Args): [string, string, unknown?] | null => {
         { expectedRev: a.expectedRev ?? preset?.rev ?? 0, preset },
       ];
     }
+    case "list_riffs":
+      return ["GET", "/api/riffs"];
+    case "get_riff":
+      return ["GET", `/api/riffs/${id}`];
+    case "set_riff": {
+      const riff = a.riff as { id?: string; rev?: number } | undefined;
+      const rid = String(a.id ?? riff?.id ?? "");
+      return [
+        "PUT",
+        `/api/riffs/${encodeURIComponent(rid)}`,
+        {
+          expectedRev: a.expectedRev ?? riff?.rev ?? 0,
+          riff,
+          tab: riff ? undefined : { tab: a.tab, name: a.name, bpm: a.bpm, step: a.step },
+        },
+      ];
+    }
     case "render":
-      return ["POST", "/api/render", { board: a.board, seconds: a.seconds }];
+      return ["POST", "/api/render", { board: a.board, riff: a.riff, seconds: a.seconds }];
     default:
       return null;
   }

@@ -153,3 +153,34 @@ test("a preset that needs a module this rig does not have says which and changes
   await expect(page.getByTestId("preset-notice")).toContainText("missing ghost@1");
   await expect(pedals).toHaveCount(before); // the board is as it was
 });
+
+test("a riff written as tab through the CLI appears in the picker and plays", async ({ page }) => {
+  // the open A string, four times: 110 Hz is easy to find in the spectrum
+  const row = (s: string) => `${s}|----|`;
+  writeFileSync(
+    join(dir, "a-string.txt"),
+    [row("e"), row("B"), row("G"), row("D"), "A|0000|", row("E")].join("\n"),
+  );
+  await page.goto(url);
+  await expect(page.getByTestId("daemon")).toContainText("connected");
+  cli(
+    "riff",
+    "new",
+    join(dir, "a-string.txt"),
+    "--id",
+    "a-string",
+    "--name",
+    "A string",
+    "--bpm",
+    "120",
+  );
+
+  await page.getByLabel("Source").selectOption("riff");
+  await page.getByRole("combobox", { name: "Riff" }).selectOption("a-string"); // no reload: the page heard about it
+  await page.getByRole("button", { name: "Start audio" }).click();
+  await page.waitForFunction(() => window.__rig?.ready === true, undefined, { timeout: 30_000 });
+  await page.getByRole("button", { name: "Listen here: Output" }).click();
+  await expect
+    .poll(() => page.evaluate(() => window.__rig?.level(110) ?? -200), { timeout: 15_000 })
+    .toBeGreaterThan(-70);
+});

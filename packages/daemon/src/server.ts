@@ -3,8 +3,16 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { extname, join, normalize, sep } from "node:path";
-import { MODULES, ModuleError } from "@rig/dsp-host";
-import { type Board, searchPresets, testClip, validateBoard } from "@rig/shared";
+import { MODULES, ModuleError, renderRiff } from "@rig/dsp-host";
+import {
+  type Board,
+  type Riff,
+  riffFromTab,
+  searchPresets,
+  testClip,
+  validateBoard,
+  validateRiff,
+} from "@rig/shared";
 import { renderAny } from "./render";
 import { checkModule, SANDBOX_SCRIPT } from "./sandbox";
 import { RigStore } from "./store";
@@ -84,6 +92,18 @@ export async function startServer(opts: ServeOptions): Promise<Running> {
     e instanceof ModuleError
       ? send(res, 422, { error: "module_failure", message: e.message })
       : send(res, 500, { error: "internal", message: String(e) });
+
+  /** A riff as given: a saved id, a whole riff, or `{ id, tab, name?, bpm?, step? }` built from ASCII tab. */
+  const riffOf = (x: unknown): { ok: true; riff: Riff } | { ok: false; errors: string[] } => {
+    if (typeof x === "string") {
+      const saved = store.getRiff(x);
+      return saved ? { ok: true, riff: saved } : { ok: false, errors: [`no riff "${x}"`] };
+    }
+    const g = x as { tab?: unknown; id?: unknown } | null;
+    return typeof g?.tab === "string"
+      ? riffFromTab({ ...g, id: String(g.id ?? "adhoc"), tab: g.tab })
+      : validateRiff(x);
+  };
 
   const watchers = new Set<ServerResponse>();
   const broadcast = (data: unknown, event?: string) => {
@@ -165,8 +185,35 @@ export async function startServer(opts: ServeOptions): Promise<Running> {
           return send(res, 422, { error: "invalid", errors: ["`expectedRev` must be an integer"] });
         const r = store.putPreset(id, body.preset, body.expectedRev as number);
         if (r.ok) {
-          broadcast({ id: r.preset.id, rev: r.preset.rev }, "presets");
-          return send(res, 200, r.preset);
+          broadcast({ id: r.doc.id, rev: r.doc.rev }, "presets");
+          return send(res, 200, r.doc);
+        }
+        if (r.kind === "stale") return send(res, 409, { error: "stale_rev", current: r.current });
+        return send(res, 422, { error: "invalid", errors: r.errors });
+      }
+    }
+    if (parts[1] === "riffs") {
+      if (parts.length === 2 && method === "GET")
+        return send(res, 200, { riffs: store.listRiffs() });
+      const id = parts[2];
+      if (id && parts.length === 3 && method === "GET") {
+        const r = store.getRiff(id);
+        return r ? send(res, 200, r) : send(res, 404, { error: "not_found" });
+      }
+      if (id && parts.length === 3 && method === "PUT") {
+        const body = (await readJson(req)) as {
+          expectedRev?: unknown;
+          riff?: unknown;
+          tab?: unknown;
+        };
+        if (!Number.isInteger(body.expectedRev))
+          return send(res, 422, { error: "invalid", errors: ["`expectedRev` must be an integer"] });
+        const v = riffOf(body.riff ?? { ...(body.tab as object), id });
+        if (!v.ok) return send(res, 422, { error: "invalid", errors: v.errors });
+        const r = store.putRiff(id, v.riff, body.expectedRev as number);
+        if (r.ok) {
+          broadcast({ id: r.doc.id, rev: r.doc.rev }, "riffs");
+          return send(res, 200, r.doc);
         }
         if (r.kind === "stale") return send(res, 409, { error: "stale_rev", current: r.current });
         return send(res, 422, { error: "invalid", errors: r.errors });
@@ -232,6 +279,7 @@ export async function startServer(opts: ServeOptions): Promise<Running> {
     if (parts[1] === "render" && parts.length === 2 && method === "POST") {
       const body = (await readJson(req)) as {
         board?: unknown; // a saved board's id, or a whole board to try without saving it
+        riff?: unknown; // play this riff (a saved id, a riff, or {tab, ...}) instead of the test clip
         seconds?: number;
         includeWav?: boolean;
       };
@@ -242,8 +290,15 @@ export async function startServer(opts: ServeOptions): Promise<Running> {
         board = v.board;
       } else board = store.getBoard(String(body.board ?? "default"));
       if (!board) return send(res, 404, { error: "not_found" });
-      const seconds = Math.min(30, Math.max(0.1, Number(body.seconds ?? 2)));
-      const input = testClip(Math.round(seconds * 48000));
+      let input: Float32Array;
+      if (body.riff !== undefined) {
+        const v = riffOf(body.riff);
+        if (!v.ok) return send(res, 422, { error: "invalid", errors: v.errors });
+        input = renderRiff(v.riff, 48000, 1.5);
+      } else {
+        const seconds = Math.min(30, Math.max(0.1, Number(body.seconds ?? 2)));
+        input = testClip(Math.round(seconds * 48000));
+      }
       try {
         const { output: out, descriptors } = await renderAny(env, board, input);
         let peak = 0;
