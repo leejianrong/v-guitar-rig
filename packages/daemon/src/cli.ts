@@ -1,7 +1,9 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { describeBoard, KNOWN_MODULES, ModuleError, renderBoard } from "@rig/dsp-host";
+import { ModuleError } from "@rig/dsp-host";
 import { type Board, testClip, validateBoard } from "@rig/shared";
+import { renderAny } from "./render";
+import { SANDBOX_SCRIPT } from "./sandbox";
 import { startServer } from "./server";
 import { RigStore } from "./store";
 import { decodeWav, encodeWav } from "./wav";
@@ -47,6 +49,9 @@ const USAGE = `rig: virtual guitar rig
   rig render --board FILE|ID [--input FILE.wav|test] [--seconds N] --out FILE.wav [--rig-dir DIR] [--json]
   rig board get ID [--json]            talk to a running daemon (--url, token from RIG_TOKEN or <rig-dir>/.rig/token)
   rig board set FILE [--expected-rev N] [--json]
+  rig module new FILE.js [--expected-rev N]   add a generated module (checked in the sandbox first)
+  rig module check ID                         re-run the safety gate on a stored module
+  rig module list
 
 Exit codes: 0 ok, 1 error, 2 validation, 3 stale rev, 4 module failure.`;
 
@@ -92,7 +97,10 @@ export async function runCli(argv: string[], io: Io): Promise<number> {
       let board: Board | null;
       const file = resolve(io.cwd, boardArg);
       if (boardArg.endsWith(".json") || existsSync(file)) {
-        const v = validateBoard(JSON.parse(readFileSync(file, "utf8")), KNOWN_MODULES);
+        const v = validateBoard(
+          JSON.parse(readFileSync(file, "utf8")),
+          new RigStore(rigDir).knownModules(),
+        );
         if (!v.ok) {
           io.err(`invalid board:\n  ${v.errors.join("\n  ")}\n`);
           return EXIT.validation;
@@ -114,10 +122,14 @@ export async function runCli(argv: string[], io: Io): Promise<number> {
         input = w.samples;
         sampleRate = w.sampleRate;
       }
-      const wasm = new WebAssembly.Module(readFileSync(wasmPath(io)));
-      const out = renderBoard(wasm, board, input, sampleRate);
+      const env = {
+        wasm: new WebAssembly.Module(readFileSync(wasmPath(io))),
+        wasmPath: wasmPath(io),
+        sandboxScript: io.env.RIG_SANDBOX ?? SANDBOX_SCRIPT,
+        store: new RigStore(rigDir),
+      };
+      const { output: out, descriptors } = await renderAny(env, board, input, sampleRate);
       writeFileSync(resolve(io.cwd, outPath), encodeWav(out, sampleRate));
-      const descriptors = describeBoard(wasm, board, out, sampleRate);
       const summary = { out: outPath, frames: out.length, sampleRate, descriptors };
       io.out(
         json
@@ -127,41 +139,65 @@ export async function runCli(argv: string[], io: Io): Promise<number> {
       return EXIT.ok;
     }
 
-    if (cmd === "board" && (sub === "get" || sub === "set")) {
-      const base = str("url") ?? io.env.RIG_URL ?? "http://127.0.0.1:7878";
-      let token = io.env.RIG_TOKEN;
-      if (!token) {
-        try {
-          token = readFileSync(join(rigDir, ".rig", "token"), "utf8").trim();
-        } catch {
-          io.err("no token: set RIG_TOKEN or point --rig-dir at the daemon's rig directory\n");
-          return EXIT.error;
+    if ((cmd === "board" && (sub === "get" || sub === "set")) || cmd === "module") {
+      const call = async (method: string, path: string, body?: unknown) => {
+        const base = str("url") ?? io.env.RIG_URL ?? "http://127.0.0.1:7878";
+        let token = io.env.RIG_TOKEN;
+        if (!token) {
+          try {
+            token = readFileSync(join(rigDir, ".rig", "token"), "utf8").trim();
+          } catch {
+            throw new Error(
+              "no token: set RIG_TOKEN or point --rig-dir at the daemon's rig directory",
+            );
+          }
         }
-      }
-      const headers = { authorization: `Bearer ${token}`, "content-type": "application/json" };
-      let res: Response;
-      if (sub === "get") {
-        if (!pos[2]) {
-          io.err("rig board get needs a board id\n");
-          return EXIT.validation;
-        }
-        res = await fetch(`${base}/api/boards/${pos[2]}`, { headers });
-      } else {
-        if (!pos[2]) {
-          io.err("rig board set needs a board file\n");
-          return EXIT.validation;
-        }
-        const board = JSON.parse(readFileSync(resolve(io.cwd, pos[2]), "utf8")) as Board;
+        const res = await fetch(`${base}${path}`, {
+          method,
+          headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        return {
+          ok: res.ok,
+          status: res.status,
+          body: (await res.json()) as Record<string, unknown>,
+        };
+      };
+      const need = (what: string, v: string | undefined) => {
+        if (v) return v;
+        throw Object.assign(new Error(`rig ${cmd} ${sub} needs ${what}`), {
+          exit: EXIT.validation,
+        });
+      };
+      let res: Awaited<ReturnType<typeof call>>;
+      if (cmd === "board" && sub === "get") {
+        res = await call("GET", `/api/boards/${need("a board id", pos[2])}`);
+      } else if (cmd === "board") {
+        const board = JSON.parse(
+          readFileSync(resolve(io.cwd, need("a board file", pos[2])), "utf8"),
+        ) as Board;
         const expectedRev =
           str("expected-rev") !== undefined ? Number(str("expected-rev")) : board.rev;
-        res = await fetch(`${base}/api/boards/${board.id}`, {
-          method: "PUT",
-          headers,
-          body: JSON.stringify({ expectedRev, board }),
+        res = await call("PUT", `/api/boards/${board.id}`, { expectedRev, board });
+      } else if (sub === "new") {
+        const source = readFileSync(resolve(io.cwd, need("a module file", pos[2])), "utf8");
+        const rev = str("expected-rev");
+        res = await call("POST", "/api/modules", {
+          source,
+          expectedRev: rev === undefined ? undefined : Number(rev),
         });
+      } else if (sub === "check") {
+        res = await call(
+          "POST",
+          `/api/modules/${encodeURIComponent(need("a module id", pos[2]))}/check`,
+        );
+      } else if (sub === "list") {
+        res = await call("GET", "/api/modules");
+      } else {
+        io.err(`${USAGE}\n`);
+        return EXIT.validation;
       }
-      const body = (await res.json()) as Record<string, unknown>;
-      const text = json ? JSON.stringify(body) : JSON.stringify(body, null, 2);
+      const text = json ? JSON.stringify(res.body) : JSON.stringify(res.body, null, 2);
       if (res.ok) {
         io.out(`${text}\n`);
         return EXIT.ok;
@@ -169,7 +205,7 @@ export async function runCli(argv: string[], io: Io): Promise<number> {
       io.err(`${text}\n`);
       if (res.status === 409) return EXIT.staleRev;
       if (res.status === 422)
-        return body.error === "module_failure" ? EXIT.module : EXIT.validation;
+        return res.body.error === "module_failure" ? EXIT.module : EXIT.validation;
       return EXIT.error;
     }
 
@@ -177,6 +213,6 @@ export async function runCli(argv: string[], io: Io): Promise<number> {
     return cmd ? EXIT.validation : EXIT.ok;
   } catch (e) {
     io.err(`${e instanceof Error ? e.message : String(e)}\n`);
-    return exitCodeFor(e);
+    return (e as { exit?: number }).exit ?? exitCodeFor(e);
   }
 }

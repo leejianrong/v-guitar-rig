@@ -36,5 +36,16 @@ echo "ok: not reachable on ${lan_ip:-<no lan address>}"
 curl -sf "$base/" | grep -q 'name="rig-token"' || { echo "FAIL: UI not served with a session token"; exit 1; }
 echo "ok: UI served"
 
+# generated modules go through the sandbox inside the image: a good one is kept, one reaching for the host is refused
+module() { # $1 = body of process(); prints the HTTP status
+  node -e 'const b=process.argv[1];process.stdout.write(JSON.stringify({source:`return {id:"smoke-fx@1",name:"Smoke",category:"drive",description:"t",params:[{id:"a",label:"A",min:0,max:1,default:0.5,unit:"",taper:"linear"}],create(){return {process(input,output,p){${b}}}}};`}))' "$1" |
+    curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $token" -H 'content-type: application/json' --data-binary @- "$base/api/modules"
+}
+code="$(module 'process.binding("fs"); output.set(input);')"
+[ "$code" = "422" ] || { echo "FAIL: a module reaching for process returned $code, expected 422"; exit 1; }
+code="$(module 'for (let i = 0; i < input.length; i++) output[i] = input[i] * (0.5 + p.a);')"
+[ "$code" = "200" ] || { echo "FAIL: a good module returned $code, expected 200"; docker compose logs rig | tail -20; exit 1; }
+echo "ok: sandbox refuses a hostile module and accepts a good one"
+
 RIG_URL="$base" RIG_TOKEN="$token" pnpm --filter @rig/web exec playwright test daemon-ui
 echo "compose smoke passed"
