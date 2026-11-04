@@ -21,6 +21,7 @@ export function useBoard() {
   const [board, setBoard] = useState<Board>(STANDALONE);
   const [link, setLink] = useState<Link>("standalone");
   const [notice, setNotice] = useState<string | null>(null);
+  const [modulesTick, setModulesTick] = useState(0); // bumps when the daemon stores a module
   const cur = useRef(board);
   const dirty = useRef(false);
   const saving = useRef(false);
@@ -77,11 +78,13 @@ export function useBoard() {
           if (done) break;
           buf += dec.decode(value, { stream: true });
           for (let i = buf.indexOf("\n\n"); i >= 0; i = buf.indexOf("\n\n")) {
-            const line = buf
-              .slice(0, i)
-              .split("\n")
-              .find((l) => l.startsWith("data: "));
+            const lines = buf.slice(0, i).split("\n");
+            const line = lines.find((l) => l.startsWith("data: "));
             buf = buf.slice(i + 2);
+            if (lines.includes("event: modules")) {
+              setModulesTick((t) => t + 1);
+              continue;
+            }
             if (!line || dirty.current) continue;
             const next = JSON.parse(line.slice(6)) as Board;
             if (next.rev > cur.current.rev) setBoard(next);
@@ -104,5 +107,5 @@ export function useBoard() {
     [flush],
   );
 
-  return { board, link, notice, dismissNotice: () => setNotice(null), edit };
+  return { board, link, notice, modulesTick, dismissNotice: () => setNotice(null), edit };
 }

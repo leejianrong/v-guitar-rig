@@ -1,11 +1,11 @@
-import type { ModuleDef } from "@rig/dsp-host";
+import type { ModuleInfo } from "@rig/dsp-host";
 import type { Slot } from "@rig/shared";
 import { finishFor } from "./finish";
 import { Knob } from "./Knob";
 
 interface Props {
   slot: Slot;
-  def: ModuleDef;
+  def: ModuleInfo;
   fault?: string;
   onParam: (id: string, v: number) => void;
   onBypass: () => void;

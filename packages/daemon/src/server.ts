@@ -86,8 +86,9 @@ export async function startServer(opts: ServeOptions): Promise<Running> {
       : send(res, 500, { error: "internal", message: String(e) });
 
   const watchers = new Set<ServerResponse>();
-  const broadcast = (board: unknown) => {
-    for (const w of watchers) w.write(`data: ${JSON.stringify(board)}\n\n`);
+  const broadcast = (data: unknown, event?: string) => {
+    for (const w of watchers)
+      w.write(`${event ? `event: ${event}\n` : ""}data: ${JSON.stringify(data)}\n\n`);
   };
 
   const server = createServer(async (req, res) => {
@@ -177,7 +178,10 @@ export async function startServer(opts: ServeOptions): Promise<Running> {
             body.source,
             typeof body.expectedRev === "number" ? body.expectedRev : undefined,
           );
-          if (r.ok) return send(res, 200, r.module);
+          if (r.ok) {
+            broadcast({ id: r.module.id, rev: r.module.rev }, "modules");
+            return send(res, 200, r.module);
+          }
           return send(res, 409, { error: "stale_rev", current: r.current });
         } catch (e) {
           return moduleFailure(res, e);

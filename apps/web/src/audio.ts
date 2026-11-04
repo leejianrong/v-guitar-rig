@@ -1,4 +1,4 @@
-import { BLOCK, Chain, type Fault, MODULES } from "@rig/dsp-host";
+import { BLOCK, Chain, type Fault } from "@rig/dsp-host";
 import type { Slot } from "@rig/shared";
 import wasmUrl from "../../../target/wasm32-unknown-unknown/release/rig_core.wasm?url";
 import workletUrl from "./worklet.ts?worker&url";
@@ -87,7 +87,13 @@ export class Rig {
     };
   }
 
-  static async start(source: Source, slots: Slot[], level: number, volume: number): Promise<Rig> {
+  static async start(
+    source: Source,
+    slots: Slot[],
+    sources: string[],
+    level: number,
+    volume: number,
+  ): Promise<Rig> {
     const ctx = new AudioContext({ sampleRate: 48000, latencyHint: "interactive" });
     await ctx.audioWorklet.addModule(workletUrl);
     const node = new AudioWorkletNode(ctx, "rig-processor", {
@@ -97,6 +103,7 @@ export class Rig {
     const ready = new Promise<void>((resolve) => {
       node.port.onmessage = (e) => e.data.type === "ready" && resolve();
     });
+    node.port.postMessage({ type: "modules", sources });
     node.port.postMessage({ type: "init", module: await loadWasm(), slots });
     await ready;
 
@@ -144,6 +151,10 @@ export class Rig {
     await this.ctx.close();
   }
 
+  /** Stored modules' source, compiled inside the worklet. */
+  setModules(sources: string[]) {
+    this.node.port.postMessage({ type: "modules", sources });
+  }
   setSlots(slots: Slot[]) {
     this.node.port.postMessage({ type: "slots", slots });
   }
@@ -180,5 +191,3 @@ export class Rig {
     return () => void this.probeListeners.delete(l);
   }
 }
-
-export const moduleName = (id: string) => MODULES[id]?.name ?? id;

@@ -1,5 +1,13 @@
 /// <reference path="./worklet-env.d.ts" />
-import { BLOCK, Chain, type Fault, Framer } from "@rig/dsp-host";
+import {
+  BLOCK,
+  Chain,
+  compileModule,
+  type Fault,
+  Framer,
+  MODULES,
+  type ModuleDef,
+} from "@rig/dsp-host";
 import type { Slot } from "@rig/shared";
 
 const PROBE_FRAMES = 48000; // record one second after the click
@@ -8,12 +16,17 @@ export const TAP_FRAME = 2048;
 type InMsg =
   | { type: "init"; module: WebAssembly.Module; slots: Slot[] }
   | { type: "slots"; slots: Slot[] }
+  | { type: "modules"; sources: string[] }
   | { type: "tap"; index: number }
   | { type: "inspect"; slot: number }
   | { type: "probe" };
 
 class RigProcessor extends AudioWorkletProcessor {
   private chain: Chain | null = null;
+  private slots: Slot[] = [];
+  /** Built-ins plus stored modules, compiled here: the worklet has no DOM, token or network to reach. */
+  private readonly registry: Record<string, ModuleDef> = { ...MODULES };
+  private readonly compiled = new Map<string, string>(); // module id -> source it was compiled from
   private readonly tmpIn = new Float32Array(BLOCK);
   private readonly tmpOut = new Float32Array(BLOCK);
   private tapIndex = -1; // -1 means the chain output
@@ -31,10 +44,14 @@ class RigProcessor extends AudioWorkletProcessor {
     this.port.onmessage = (e: MessageEvent<InMsg>) => {
       const m = e.data;
       if (m.type === "init") {
-        this.chain = new Chain(m.module, sampleRate);
-        this.chain.setSlots(m.slots);
+        this.wasm = m.module;
+        this.slots = m.slots;
+        this.chain = this.newChain();
         this.port.postMessage({ type: "ready" });
-      } else if (m.type === "slots") this.chain?.setSlots(m.slots);
+      } else if (m.type === "slots") {
+        this.slots = m.slots;
+        this.chain?.setSlots(m.slots);
+      } else if (m.type === "modules") this.load(m.sources);
       else if (m.type === "tap") {
         this.tapIndex = m.index;
         this.tapFrames.reset();
@@ -47,6 +64,35 @@ class RigProcessor extends AudioWorkletProcessor {
         this.probePos = 0;
       }
     };
+  }
+
+  private wasm: WebAssembly.Module | null = null;
+
+  private newChain(): Chain {
+    const chain = new Chain(this.wasm as WebAssembly.Module, sampleRate, this.registry);
+    chain.setSlots(this.slots);
+    return chain;
+  }
+
+  /** Compile new or changed sources. A running chain keeps stale instances and faults, so it is rebuilt. */
+  private load(sources: string[]) {
+    let changed = false;
+    for (const source of sources) {
+      try {
+        const def = compileModule(source);
+        if (this.compiled.get(def.id) === source) continue;
+        this.registry[def.id] = def;
+        this.compiled.set(def.id, source);
+        changed = true;
+      } catch {
+        // the daemon gated this source when it was stored; a slot using it shows "not in the registry"
+      }
+    }
+    if (changed && this.chain) {
+      this.chain = this.newChain();
+      this.faultsSent = 0;
+      this.port.postMessage({ type: "faults", faults: [] });
+    }
   }
 
   process(inputs: Float32Array[][], outputs: Float32Array[][]): boolean {
