@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { KNOWN_MODULES } from "@rig/dsp-host";
+import { KNOWN_MODULES, STARTER_PRESETS } from "@rig/dsp-host";
 import { type Board, type Preset, validateBoard, validatePreset } from "@rig/shared";
 import type { ModuleInfo } from "./sandbox";
 
@@ -99,15 +99,19 @@ export class RigStore {
     return { ok: true, board: next };
   }
 
+  /** The shipped presets first, then the user's. Shipped ones are read-only. */
   listPresets(): Preset[] {
-    return readdirSync(this.presetsDir)
+    const mine = readdirSync(this.presetsDir)
       .filter((f) => f.endsWith(".json"))
       .map((f) => this.getPreset(f.slice(0, -5)))
       .filter((p): p is Preset => p !== null);
+    return [...STARTER_PRESETS, ...mine];
   }
 
   getPreset(id: string): Preset | null {
     if (!SLUG.test(id)) return null;
+    const shipped = STARTER_PRESETS.find((p) => p.id === id);
+    if (shipped) return shipped;
     try {
       const v = validatePreset(
         JSON.parse(readFileSync(join(this.presetsDir, `${id}.json`), "utf8")),
@@ -123,6 +127,12 @@ export class RigStore {
   putPreset(id: string, preset: unknown, expectedRev: number): PutPresetResult {
     const v = validatePreset(preset, this.knownModules());
     if (!v.ok) return { ok: false, kind: "invalid", errors: v.errors };
+    if (STARTER_PRESETS.some((p) => p.id === id))
+      return {
+        ok: false,
+        kind: "invalid",
+        errors: [`"${id}" is a shipped preset and cannot be changed; save a copy under another id`],
+      };
     if (v.preset.id !== id)
       return { ok: false, kind: "invalid", errors: ["preset id does not match the URL"] };
     const current = this.getPreset(id);

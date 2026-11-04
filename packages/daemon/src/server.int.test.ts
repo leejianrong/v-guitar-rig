@@ -390,9 +390,9 @@ describe("presets", () => {
     expect(made.code).toBe(EXIT.ok);
     const got = (await (await api("/api/presets/test-crunch")).json()) as typeof preset;
     expect(got.slots[0]?.params.drive).toBe(9);
-    expect(
-      ((await (await api("/api/presets")).json()) as { presets: unknown[] }).presets,
-    ).toHaveLength(1);
+    const listed = ((await (await api("/api/presets")).json()) as { presets: { id: string }[] })
+      .presets;
+    expect(listed.map((p) => p.id)).toEqual(expect.arrayContaining(["glass-clean", "test-crunch"]));
     expect((await cli(["preset", "get", "test-crunch"])).out).toContain("Test Crunch");
 
     expect((await cli(["preset", "new", file("p.json", preset), "--expected-rev", "5"])).code).toBe(
@@ -400,6 +400,16 @@ describe("presets", () => {
     );
     expect((await cli(["preset", "new", file("p.json", preset), "--expected-rev", "0"])).code).toBe(
       EXIT.ok,
+    );
+  });
+
+  it("lists the shipped presets, and refuses to overwrite one", async () => {
+    const shipped = (await (await api("/api/presets/glass-clean")).json()) as typeof preset;
+    expect(shipped.tags).toContain("clean");
+    const clash = file("c.json", { ...preset, id: "glass-clean" });
+    expect((await cli(["preset", "new", clash])).code).toBe(EXIT.validation);
+    expect(((await (await api("/api/presets/glass-clean")).json()) as typeof preset).name).toBe(
+      "Glass Clean",
     );
   });
 
