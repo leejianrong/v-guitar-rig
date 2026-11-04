@@ -104,6 +104,21 @@ describe("MCP server", () => {
     expect(render.peak).toBeGreaterThan(0.1);
   });
 
+  it("renders an unsaved board without saving it, and reports an invalid one", async () => {
+    const saved = (await tool("get_board")).json();
+    const [before, trial] = [(await tool("render", { seconds: 1 })).json(), structuredClone(saved)];
+    trial.slots.push({ id: "try-fuzz", module: "fuzz@1", bypass: false, params: {} });
+    const tried = (await tool("render", { board: trial, seconds: 1 })).json();
+    expect(tried.descriptors.centroidHz).not.toBeCloseTo(before.descriptors.centroidHz, 0);
+    expect((await tool("get_board")).json().rev).toBe(saved.rev); // nothing was written
+    expect(((await tool("render", { seconds: 1 })).json() as typeof before).peak).toBe(before.peak);
+
+    trial.slots.push({ id: "bad", module: "no-such@1", bypass: false, params: {} });
+    const bad = await tool("render", { board: trial });
+    expect(bad.isError).toBe(true);
+    expect(bad.text).toContain("no-such@1");
+  });
+
   it("returns a stale rev as a tool error the model can act on", async () => {
     const board = (await tool("get_board")).json();
     const r = await tool("set_board", { board, expectedRev: board.rev - 1 });
