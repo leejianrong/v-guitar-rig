@@ -61,6 +61,7 @@ export class Rig {
   private pairListeners = new Set<(p: Pair) => void>();
   private faultListeners = new Set<(f: Fault[]) => void>();
   private probeListeners = new Set<(r: ProbeResult) => void>();
+  private beatListeners = new Set<(b: { beat: number; ended: boolean }) => void>();
 
   private constructor(
     ctx: AudioContext,
@@ -77,6 +78,7 @@ export class Rig {
       const m = e.data;
       if (m.type === "tap") for (const l of this.tapListeners) l(m.frame);
       else if (m.type === "pair") for (const l of this.pairListeners) l(m);
+      else if (m.type === "beat") for (const l of this.beatListeners) l(m);
       else if (m.type === "faults") for (const l of this.faultListeners) l(m.faults);
       else if (m.type === "probe-result") {
         const d = m.data as Float32Array;
@@ -177,9 +179,17 @@ export class Rig {
     this.level.gain.value = v;
     this.node.port.postMessage({ type: "input", synth: this.synth, level: v });
   }
-  /** Play `riff` on the virtual guitar (looping), or stop with null. Only for the riff source. */
-  playRiff(riff: Riff | null) {
-    this.node.port.postMessage({ type: "riff", riff, loop: true });
+  /**
+   * Play `riff` on the virtual guitar, or stop with null. With `keep` an edited riff replaces the one
+   * playing without restarting. Only for the riff source.
+   */
+  playRiff(riff: Riff | null, loop = true, keep = false) {
+    this.node.port.postMessage({ type: "riff", riff, loop, keep });
+  }
+  /** The virtual guitar's playhead, in beats, about 23 times a second while it plays. */
+  onBeat(l: (b: { beat: number; ended: boolean }) => void) {
+    this.beatListeners.add(l);
+    return () => void this.beatListeners.delete(l);
   }
   setVolume(v: number) {
     this.volume.gain.value = v;

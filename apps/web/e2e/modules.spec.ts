@@ -184,3 +184,39 @@ test("a riff written as tab through the CLI appears in the picker and plays", as
     .poll(() => page.evaluate(() => window.__rig?.level(110) ?? -200), { timeout: 15_000 })
     .toBeGreaterThan(-70);
 });
+
+test("a riff typed into the editor is saved to the daemon, and a shipped name is refused", async ({
+  page,
+}) => {
+  await page.goto(url);
+  await expect(page.getByTestId("daemon")).toContainText("connected");
+  await page.getByLabel("Source").selectOption("riff");
+  await page.getByRole("button", { name: "New riff" }).click();
+  await page.getByLabel("Name").fill("Pentatonic lick"); // a shipped riff's name
+  const cell = (string: number, slot: number) =>
+    page.getByRole("button", { name: new RegExp(`^String ${string}, step ${slot + 1}(:|$)`) });
+  await cell(5, 0).click();
+  await page.keyboard.press("1");
+  await page.keyboard.press("2"); // two digits in a row make fret 12
+  await page.keyboard.press("h");
+  await cell(5, 2).click();
+  await page.keyboard.press("7");
+
+  await page.getByRole("button", { name: "Save riff" }).click();
+  await expect(
+    page.getByRole("status").filter({ hasText: "Give this one another name" }),
+  ).toBeVisible();
+
+  await page.getByLabel("Name").fill("E2E saved");
+  await page.getByRole("button", { name: "Save riff" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Saved." })).toBeVisible();
+  const saved = JSON.parse(cli("riff", "get", "e2e-saved")) as {
+    name: string;
+    notes: { string: number; fret: number; at: number; tech?: string }[];
+  };
+  expect(saved.name).toBe("E2E saved");
+  expect(saved.notes.map((n) => [n.string, n.fret, n.at, n.tech])).toEqual([
+    [5, 12, 0, "hammer"],
+    [5, 7, 1, undefined],
+  ]);
+});

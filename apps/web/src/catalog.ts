@@ -79,3 +79,25 @@ export const missingModules = (preset: Preset, catalog: Catalog): string[] => [
 /** A preset's slots as new slots for the board: same modules and knobs, fresh ids. */
 export const slotsOf = (preset: Preset): Slot[] =>
   preset.slots.map((s) => ({ ...s, id: crypto.randomUUID(), params: { ...s.params } }));
+
+/** Save a riff to the daemon. `expectedRev` is 0 for a new one, else the rev being replaced. */
+export async function saveRiff(
+  riff: Riff,
+  expectedRev: number,
+): Promise<{ ok: true; riff: Riff } | { ok: false; message: string }> {
+  const token = document.querySelector<HTMLMetaElement>('meta[name="rig-token"]')?.content;
+  const res = await fetch(`/api/riffs/${riff.id}`, {
+    method: "PUT",
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: JSON.stringify({ expectedRev, riff }),
+  });
+  const body = await res.json();
+  if (res.ok) return { ok: true, riff: body as Riff };
+  return {
+    ok: false,
+    message:
+      res.status === 409
+        ? "This riff changed elsewhere; pick it again to reload it."
+        : ((body.errors as string[] | undefined)?.join("; ") ?? String(body.error)),
+  };
+}
