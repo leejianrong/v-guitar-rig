@@ -9,6 +9,7 @@ import { renderOffline } from "./offline";
 import { Board, tapLabel } from "./ui/Board";
 import { Inspector, pairLevels } from "./ui/Inspector";
 import { Library } from "./ui/Library";
+import { Meter } from "./ui/Meter";
 import { RiffEditor } from "./ui/RiffEditor";
 import { levelAt, Scope } from "./ui/Scope";
 
@@ -215,6 +216,7 @@ export function App() {
             onTap={setTap}
             edit={edit}
           />
+          <Meter rig={rig} />
           {selectedDef && selectedSlot && (
             <Inspector def={selectedDef} slot={selectedSlot} rig={rig} />
           )}

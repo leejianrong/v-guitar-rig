@@ -168,7 +168,7 @@ Notes line up by the column of their first digit, one step each (a half beat unl
   {
     name: "render",
     description:
-      "Render a board over a guitar-like test clip, or over a riff, and return level, peak and descriptors: rmsDb, peakDb, crestDb, centroidHz, rolloffHz, bandsDb, thdPercent, tailMs.",
+      "Render a board over a guitar-like test clip, or over a riff, and return level, peak, loudness (LUFS: integrated, shortTermMax, peak) and descriptors: rmsDb, peakDb, crestDb, centroidHz, rolloffHz, bandsDb, thdPercent, tailMs.",
     inputSchema: obj({
       board: {
         description:

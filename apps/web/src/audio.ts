@@ -1,4 +1,4 @@
-import { BLOCK, Chain, type Fault } from "@rig/dsp-host";
+import { BLOCK, Chain, type Fault, type Loudness } from "@rig/dsp-host";
 import type { Riff, Slot } from "@rig/shared";
 import wasmUrl from "../../../target/wasm32-unknown-unknown/release/rig_core.wasm?url";
 import workletUrl from "./worklet.ts?worker&url";
@@ -61,6 +61,7 @@ export class Rig {
   private pairListeners = new Set<(p: Pair) => void>();
   private faultListeners = new Set<(f: Fault[]) => void>();
   private probeListeners = new Set<(r: ProbeResult) => void>();
+  private meterListeners = new Set<(m: Loudness) => void>();
   private beatListeners = new Set<(b: { beat: number; ended: boolean }) => void>();
 
   private constructor(
@@ -78,6 +79,7 @@ export class Rig {
       const m = e.data;
       if (m.type === "tap") for (const l of this.tapListeners) l(m.frame);
       else if (m.type === "pair") for (const l of this.pairListeners) l(m);
+      else if (m.type === "meter") for (const l of this.meterListeners) l(m);
       else if (m.type === "beat") for (const l of this.beatListeners) l(m);
       else if (m.type === "faults") for (const l of this.faultListeners) l(m.faults);
       else if (m.type === "probe-result") {
@@ -185,6 +187,14 @@ export class Rig {
    */
   playRiff(riff: Riff | null, loop = true, keep = false) {
     this.node.port.postMessage({ type: "riff", riff, loop, keep });
+  }
+  /** The loudness of the chain output (before the limiter and volume), about 30 times a second. */
+  onMeter(l: (m: Loudness) => void) {
+    this.meterListeners.add(l);
+    return () => void this.meterListeners.delete(l);
+  }
+  resetMeter() {
+    this.node.port.postMessage({ type: "meter-reset" });
   }
   /** The virtual guitar's playhead, in beats, about 23 times a second while it plays. */
   onBeat(l: (b: { beat: number; ended: boolean }) => void) {

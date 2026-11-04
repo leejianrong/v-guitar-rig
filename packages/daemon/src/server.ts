@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { extname, join, normalize, sep } from "node:path";
-import { MODULES, ModuleError, renderRiff } from "@rig/dsp-host";
+import { MODULES, ModuleError, measureLoudness, renderRiff } from "@rig/dsp-host";
 import {
   type Board,
   type Riff,
@@ -313,6 +313,7 @@ export async function startServer(opts: ServeOptions): Promise<Running> {
           peak,
           rms: Math.sqrt(sum / out.length),
           descriptors,
+          loudness: measureLoudness(out, 48000),
           wav: body.includeWav ? encodeWav(out, 48000).toString("base64") : undefined,
         });
       } catch (e) {
