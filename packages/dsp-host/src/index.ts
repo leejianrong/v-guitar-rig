@@ -1,6 +1,7 @@
 export * from "./chain";
 export * from "./compile";
 export * from "./core";
+export * from "./describe";
 export * from "./fft";
 export * from "./framer";
 export * from "./gate";

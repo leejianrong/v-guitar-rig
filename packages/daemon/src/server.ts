@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { extname, join, normalize, sep } from "node:path";
-import { ModuleError, renderBoard } from "@rig/dsp-host";
+import { describeBoard, ModuleError, renderBoard } from "@rig/dsp-host";
 import { testClip } from "@rig/shared";
 import { RigStore } from "./store";
 import { encodeWav } from "./wav";
@@ -158,6 +158,7 @@ export async function startServer(opts: ServeOptions): Promise<Running> {
           frames: out.length,
           peak,
           rms: Math.sqrt(sum / out.length),
+          descriptors: describeBoard(wasm, board, out),
           wav: body.includeWav ? encodeWav(out, 48000).toString("base64") : undefined,
         });
       } catch (e) {
