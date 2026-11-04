@@ -4,13 +4,15 @@ Plug in your guitar, play through virtual pedals and amps in the browser, and wa
 
 ![Pedalboard with four pedals, jacks between them, and the waveform and spectrogram at the selected jack](docs/img/screenshot.png)
 
-> **Early stage.** A diode clipper is solved from its netlist in real time, with a pedalboard editor, six more pedals, a daemon, board files and an offline renderer behind it. MCP and amp sims are planned; see [docs/SLICES.md](docs/SLICES.md).
+> **Early stage.** Working today: a circuit-solved diode clipper, seven more pedals (wah included), a valve preamp and power amp with an effects loop, a speaker cab, twelve presets, a plucked-string virtual guitar with a tab editor, a LUFS meter, a daemon with CLI and MCP, and an offline renderer. Not built yet: tubes and transistors solved from netlists, tone matching from a track, the digital twin. See [docs/SLICES.md](docs/SLICES.md).
 
 ```mermaid
 flowchart LR
-  G[Guitar or DI file] --> A[AudioWorklet<br/>Rust DSP core as WASM]
+  G[Guitar, virtual guitar riff<br/>or audio file] --> A[AudioWorklet<br/>Rust DSP core as WASM]
   A --> S[Speakers]
-  A -.taps.-> V[Waveform and spectrogram]
+  A -.taps.-> V[Waveform, spectrogram,<br/>LUFS meter]
+  L[LLM via MCP or CLI] --> D[Daemon: boards,<br/>presets, riffs, modules]
+  D --> A
 ```
 
 ## Quick start
@@ -36,21 +38,19 @@ Live audio always runs in your browser; Docker cannot reach a Windows sound card
 
 ## Usage
 
-1. Choose **Test tone** to hear the board with no hardware, or **Guitar input** to play through your audio interface, then press **Start audio** (and **Stop audio** to end it). Keep your volume low at first; **Output volume** sits after the limiter.
-2. Build a board: click a pedal on the shelf at the left to add it, drag a pedal by its name (or use the arrows) to reorder, turn a knob by dragging it, or click it and use the mouse wheel (arrow keys and double-click to reset also work), and press a footswitch to bypass. Click a jack on a cable to see the waveform and spectrogram at that point in the chain. Click a pedal to inspect it: before/after spectrum, input and output level, and measured transfer curve and frequency response, plus echo taps for the delay and the sweep for the chorus.
-3. For offline rendering, build the CLI and render the default board through the same DSP core:
+1. **Play.** Pick a source (**Test tone**, **Guitar input**, **Virtual guitar (riff)** or **Audio file**) and press **Start audio**. Keep the volume low at first; **Output volume** sits after the limiter.
+2. **Build a board.** Click a pedal on the shelf to add it, or load a preset. Drag by the name to reorder, drag or scroll a knob, press a footswitch to bypass. Click a jack to see the waveform and spectrogram there, or a pedal to see its before/after spectrum and measured curves.
+3. **Amp and loop.** Put the **Valve Preamp** and **Power Amp** on the board and they draw as one head. Pedals between them sit in the effects loop; the shelf puts delay, reverb and chorus there for you. The **Wah** goes in front, with a treadle you drag.
+4. **Test a tone on a riff.** The virtual guitar plays a riff you pick; edit it in the tab editor under the board while it plays (`h` `p` `s` `b` `m` for hammer-on, pull-off, slide, bend, palm mute). The **Level** strip reads LUFS (BS.1770) and peak; the shipped presets are levelled to about -16 LUFS on the shipped riffs.
+5. **Render offline** through the same DSP core:
    ```bash
    pnpm --filter @rig/daemon build
-   node packages/daemon/dist/rig.mjs render --board default --seconds 5 --out out.wav
+   node packages/daemon/dist/rig.mjs render --board default --riff pentatonic-lick --out out.wav
    ```
-   The browser worklet and this renderer agree to within 1e-5 (measured: exactly equal on a 5 s clip).
-4. To add a generated pedal, write its source (the format is documented at the top of `packages/dsp-host/src/compile.ts`; ADR-0004 describes the sandbox it runs in) and `rig module new my-pedal.js` against the running daemon; it is checked in a sandbox before it is kept, and `rig module list` / `rig module check ID` show and re-check what is stored. Stored modules render offline and return descriptors (`rig render --json`), and play in the browser as soon as they are stored.
-5. To let your own LLM do this, point an MCP client at `node packages/daemon/dist/rig.mjs mcp` (stdio; set `RIG_URL` and `RIG_TOKEN`, or `--rig-dir` to read the token). It offers tools to list, add and check modules, get and set boards and presets, write riffs, and render with descriptors, plus prompts that explain the module format and the loop.
-6. The amp comes as a **Valve Preamp** and a **Power Amp** (and the one-piece Valve Amp). Put both on the board and they draw as one amp head; pedals between them are its effects loop, so delay, reverb and chorus (which the shelf puts there for you) are pushed through the power stage and speaker as in a real rig. The Speaker Cab is drawn as a cabinet. The **Wah** has a treadle you drag (or scroll, or move with the arrow keys): a resonant filter from 350 Hz at the heel to 2.2 kHz at the toe, or set Auto to rock it by itself; it goes in front of the amp.
-7. To test a tone on a riff instead of the test tone, choose **Virtual guitar (riff)** as the source: a plucked-string guitar plays the riff you pick, and a tab editor under the board lets you click a cell and type frets (`h` hammer-on, `p` pull-off, `s` slide, `b` bend, `m` palm mute) while it plays. Save a riff from the editor, or choose **Audio file** as the source to play a recording of your own (looped, stereo mixed to mono). Riffs can also be added with `rig riff new FILE.json`, or ASCII tab with `rig riff new lick.txt --id lick --bpm 100`; The **Level** strip shows the chain output's loudness (momentary, short-term and integrated LUFS to ITU-R BS.1770, and peak); every shipped preset is levelled to about -16 LUFS on the shipped riffs. `rig render --riff ID` and the MCP `render` tool (which also return LUFS) play a riff through a board offline, and `set_riff` lets an LLM write one.
-8. For round-trip latency, connect your interface output to an input with a cable and press **Measure loopback latency**.
+   It prints the LUFS. The browser worklet and this renderer agree to within 1e-5.
+6. **Let your LLM do it.** Point an MCP client at `node packages/daemon/dist/rig.mjs mcp` (stdio; set `RIG_URL` and `RIG_TOKEN`, or `--rig-dir`). Tools list, add and check modules, get and set boards, presets and riffs, and render. Riffs also come in with `rig riff new lick.txt --id lick --bpm 100` (ASCII tab), and a new pedal with `rig module new my-pedal.js` (format at the top of `packages/dsp-host/src/compile.ts`; it runs in a sandbox, see ADR-0004).
 
-The measured CPU headroom on the author's machine is about 13x per 128-frame block; hardware latency numbers are not recorded yet ([docs/hardware-checks.md](docs/hardware-checks.md)).
+CPU headroom is about 13x per 128-frame block on the author's machine. Hardware latency is not recorded yet ([docs/hardware-checks.md](docs/hardware-checks.md)); to measure it, loop an interface output to an input and press **Measure**.
 
 ## Documentation
 

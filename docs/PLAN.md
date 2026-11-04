@@ -25,6 +25,7 @@ A web app (plus local daemon) where you plug a guitar into your audio interface 
 - Live guitar input (or DI file fallback) through a board of modules to the output, round-trip latency measured and reported.
 - Library browser for pedals, amps, cabs and boards; board editor with knobs, bypass, reorder.
 - Module kinds: behavioral TypeScript, one circuit-solved pedal, NAM capture for shipped amp presets (ADR-0003).
+- Riff input (a plucked-string virtual guitar with a tab editor), audio-file input and a LUFS meter, so a tone can be judged on playing (ADR-0008).
 - Live waveform, spectrogram, and host-drawn per-effect visuals (ADR-0005).
 - Daemon in docker compose with an HTTP API plus server-sent events, CLI and MCP; offline render with parity to the browser.
 - Vibe-coding behavioral pedals and amps safely (ADR-0004).

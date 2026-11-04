@@ -8,7 +8,7 @@ Trust the code over the docs where they disagree, and fix the docs in the same P
 
 - `make` lists targets. `make install` then `make hooks` once per clone.
 - `make check` is the fast gate and what pre-push runs. Run it before proposing a push. Never add a slow or infra-needing check to it.
-- `make test-integration` and `make test-e2e` build the WASM core first (`make wasm`). e2e also needs `pnpm --filter @rig/web exec playwright install chromium` once.
+- `make test-integration` and `make test-e2e` build the WASM core first (`make wasm`). e2e also needs `pnpm --filter @rig/web exec playwright install chromium` once. Run e2e through `pnpm --filter @rig/web test:e2e` (it builds first); bare `playwright test` serves a stale `dist` to the daemon-backed specs.
 - `make test-compose` boots the real docker stack (about a minute). `make up` runs it for manual use; rig files live in `./rig` (ignored).
 - CLI during development: `pnpm --filter @rig/daemon build` then `node packages/daemon/dist/rig.mjs <cmd>`. Exit codes: 0 ok, 1 error, 2 validation, 3 stale rev, 4 module failure.
 - `make demo` builds and serves everything locally on a free port (no Docker).
