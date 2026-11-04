@@ -11,13 +11,20 @@ test("picking a preset replaces the board with its pedals and knob settings sile
   expect(await order()).toEqual(["pedal-diode-clipper@1"]);
 
   await page.getByRole("button", { name: "Load preset Cosmic Lead" }).click();
+  // an amp head (preamp, power amp) whose loop holds the delay and reverb, then the cab
+  const head = page.getByTestId("amp-head");
+  await expect(head.getByTestId("pedal-preamp@1")).toBeVisible();
+  await expect(head.getByTestId("pedal-delay@1")).toBeVisible();
+  await expect(head.getByTestId("pedal-reverb@1")).toBeVisible();
   expect(await order()).toEqual([
     "pedal-overdrive@1",
-    "pedal-amp@1",
-    "pedal-cab@1",
+    "pedal-preamp@1",
+    "pedal-poweramp@1",
     "pedal-delay@1",
     "pedal-reverb@1",
+    "pedal-cab@1",
   ]);
+  await page.screenshot({ path: "test-results/preset-loop.png" });
   const feedback = page.getByTestId("pedal-delay@1").getByRole("slider", { name: "Feedback" });
   await expect(feedback).toHaveAttribute("aria-valuenow", "0.5"); // the preset's value, not the default 0.4
   await expect(page.getByTestId("preset-notice")).toHaveCount(0); // loading is silent
