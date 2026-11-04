@@ -62,3 +62,13 @@ export function validateBoard(input: unknown, knownModules: ReadonlySet<string>)
   }
   return errors.length > 0 ? { ok: false, errors } : { ok: true, board: input as Board };
 }
+
+/**
+ * Where a pedal goes to be in an amp's effects loop: the index of the power amp, when a preamp comes
+ * before it. -1 when the board has no loop (no preamp-then-power-amp pair).
+ */
+export function loopInsertAt(slots: Slot[]): number {
+  const power = slots.findIndex((s) => s.module === "poweramp@1");
+  const pre = slots.findIndex((s) => s.module === "preamp@1");
+  return pre >= 0 && power > pre ? power : -1;
+}

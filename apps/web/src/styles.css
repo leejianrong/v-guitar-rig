@@ -804,3 +804,188 @@ h1 {
   background: #2a2210;
   box-shadow: inset 3px 0 0 var(--signal);
 }
+
+/* amp head and speaker cabinet: black tolex, a brass faceplate, grille cloth over the speaker */
+.amp,
+.cabbox {
+  position: relative;
+  flex: 0 0 auto;
+  align-self: center;
+  border-radius: 12px;
+  background:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.025) 0 2px, transparent 2px 5px), #17171a;
+  box-shadow:
+    0 14px 28px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 2px #050506,
+    inset 0 2px 0 rgba(255, 255, 255, 0.07);
+}
+.amp.selected,
+.cabbox.selected,
+.amp-panel.selected {
+  outline: 2px solid var(--signal);
+  outline-offset: 4px;
+}
+.amp {
+  padding: 22px 16px 14px;
+  display: grid;
+  gap: 12px;
+}
+.amp-handle {
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  width: 110px;
+  height: 14px;
+  translate: -50% 0;
+  border-radius: 8px 8px 0 0;
+  background: #0c0c0e;
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.08);
+}
+.amp-face {
+  display: flex;
+  gap: 0;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #d8bd7b, #b3914d 55%, #a1813f);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.3),
+    0 2px 6px rgba(0, 0, 0, 0.5);
+}
+.amp-panel {
+  --ink: #20170a;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 26px 14px 14px;
+  color: var(--ink);
+  min-width: 150px;
+}
+.amp-panel + .amp-panel {
+  border-left: 2px solid rgba(60, 40, 10, 0.35);
+}
+.amp-panel.off,
+.cabbox.off {
+  filter: saturate(0.5) brightness(0.8);
+}
+.amp-panel .pedal-tools,
+.cabbox .pedal-tools {
+  top: 4px;
+}
+.amp-panel:hover .pedal-tools,
+.amp-panel:focus-within .pedal-tools,
+.cabbox:hover .pedal-tools,
+.cabbox:focus-within .pedal-tools {
+  opacity: 1;
+}
+.amp-name {
+  cursor: grab;
+  font-family: var(--display);
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.standby {
+  width: 34px;
+  height: 18px;
+  padding: 0;
+  border-radius: 9px;
+  background: #1a1408;
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  display: grid;
+  place-items: center start;
+}
+.standby .jewel {
+  width: 14px;
+  height: 14px;
+  margin-left: 2px;
+  border-radius: 50%;
+  background: #4a1512;
+  transition: translate 120ms;
+}
+.standby.lit .jewel {
+  translate: 14px 0;
+  background: radial-gradient(circle at 35% 30%, #ff8a7a, var(--led) 60%);
+  box-shadow: 0 0 8px 1px rgba(255, 59, 47, 0.7);
+}
+.amp-loop {
+  display: grid;
+  gap: 8px;
+  padding: 8px 12px 12px;
+  border-radius: 6px;
+  background: #0d0d0f;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.8);
+}
+.amp-loop-head {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #b3914d;
+}
+.amp-loop-title {
+  color: var(--muted);
+}
+.amp-loop-row {
+  display: flex;
+  align-items: center;
+  min-height: 70px;
+  overflow-x: auto;
+}
+.amp-loop-empty {
+  color: var(--muted);
+  font-size: 13px;
+  padding: 0 12px;
+}
+.cabbox {
+  width: 230px;
+  padding: 14px 14px 18px;
+  display: grid;
+  gap: 12px;
+}
+.cab-plate {
+  --ink: #20170a;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px 12px 12px;
+  border-radius: 6px;
+  color: var(--ink);
+  background: linear-gradient(180deg, #d8bd7b, #b3914d 55%, #a1813f);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.35),
+    0 2px 6px rgba(0, 0, 0, 0.5);
+}
+.cab-grille {
+  height: 190px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.45) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.45) 0 1px, transparent 1px 4px), #3a2e22;
+  box-shadow: inset 0 3px 8px rgba(0, 0, 0, 0.7);
+}
+.cab-speaker {
+  width: 138px;
+  height: 138px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    #0b0b0c 0 14%,
+    #1c1c1f 15% 38%,
+    #121214 39% 62%,
+    #232326 63% 70%,
+    #0b0b0c 71%
+  );
+  box-shadow:
+    0 0 0 4px rgba(0, 0, 0, 0.5),
+    0 0 14px rgba(0, 0, 0, 0.8);
+  opacity: 0.8;
+}

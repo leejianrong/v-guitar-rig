@@ -1,5 +1,5 @@
 import { MODULES, type ModuleInfo, STARTER_PRESETS, STARTER_RIFFS } from "@rig/dsp-host";
-import type { Preset, Riff, Slot } from "@rig/shared";
+import { loopInsertAt, type Preset, type Riff, type Slot } from "@rig/shared";
 import { useEffect, useState } from "react";
 
 /** Every module the page can show by id. Built-ins carry code; stored modules are metadata only. */
@@ -79,6 +79,18 @@ export const missingModules = (preset: Preset, catalog: Catalog): string[] => [
 /** A preset's slots as new slots for the board: same modules and knobs, fresh ids. */
 export const slotsOf = (preset: Preset): Slot[] =>
   preset.slots.map((s) => ({ ...s, id: crypto.randomUUID(), params: { ...s.params } }));
+
+/**
+ * The board with a new pedal on it. Delay, reverb, chorus and the like go in the amp's effects loop
+ * (just before its power amp) when the board has one; everything else goes on the end.
+ */
+export function withPedal(slots: Slot[], module: string, category: string): Slot[] {
+  const pedal: Slot = { id: crypto.randomUUID(), module, bypass: false, params: {} };
+  const loop = loopInsertAt(slots);
+  if ((category === "time" || category === "mod") && loop >= 0)
+    return [...slots.slice(0, loop), pedal, ...slots.slice(loop)];
+  return [...slots, pedal];
+}
 
 /** True while the board is exactly the preset: same pedals in order, bypass and knob values. Any edit ends it. */
 export const matchesPreset = (slots: Slot[], preset: Preset): boolean =>

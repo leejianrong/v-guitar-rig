@@ -1,4 +1,4 @@
-import { amp } from "./amp";
+import { amp, powerampModule, preampModule } from "./amp";
 import { cab } from "./cab";
 import type { ModuleDef, Processor } from "./modules";
 
@@ -217,4 +217,15 @@ const gate: ModuleDef = {
   },
 };
 
-export const STARTER: ModuleDef[] = [overdrive, fuzz, delay, chorus, reverb, gate, amp, cab];
+export const STARTER: ModuleDef[] = [
+  overdrive,
+  fuzz,
+  delay,
+  chorus,
+  reverb,
+  gate,
+  preampModule,
+  powerampModule,
+  amp,
+  cab,
+];

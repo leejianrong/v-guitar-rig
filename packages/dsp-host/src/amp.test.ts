@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { amp } from "./amp";
+import { amp, powerampModule, preampModule } from "./amp";
 import { BLOCK } from "./chain";
 import { spectralDescriptors, thdPercent } from "./describe";
 
@@ -70,5 +70,40 @@ describe("valve amp", () => {
     const loud = tone(0.9, SR * 2);
     const tail = (sag: number) => rms(play(loud, { sag, gain: 4 }).subarray(SR));
     expect(20 * Math.log10(tail(0) / tail(1))).toBeGreaterThan(1);
+  });
+});
+
+describe("preamp and power amp", () => {
+  const through = (m: typeof amp, x: Float32Array, params: Record<string, number> = {}) => {
+    const proc = m.create(SR, {} as WebAssembly.Module);
+    const all = { ...Object.fromEntries(m.params.map((q) => [q.id, q.default])), ...params };
+    const out = new Float32Array(x.length);
+    const o = new Float32Array(BLOCK);
+    for (let at = 0; at + BLOCK <= x.length; at += BLOCK) {
+      proc.process(x.subarray(at, at + BLOCK), o, all);
+      out.set(o, at);
+    }
+    return out;
+  };
+  const knobs = { gain: 30, bass: 0.7, mid: 0.4, treble: 0.6, sag: 0.6, master: 1 };
+  const boost = (x: Float32Array, k: number) => x.map((v) => v * k);
+  const peak = (x: Float32Array) => x.reduce((a, v) => Math.max(a, Math.abs(v)), 0);
+
+  it("in series are the whole amp, to within 32-bit rounding at the join", () => {
+    const x = tone(0.5, SR / 2);
+    const split = through(powerampModule, through(preampModule, x, knobs), knobs);
+    const whole = through(amp, x, knobs);
+    const worst = whole.reduce((a, v, i) => Math.max(a, Math.abs(v - (split[i] as number))), 0);
+    expect(worst).toBeLessThan(1e-5);
+  });
+
+  it("push a loop pedal through the power stage, which a pedal after the amp skips", () => {
+    // a 3x boost standing in for any loop pedal that raises the level
+    const x = tone(0.4, SR / 2);
+    const pre = through(preampModule, x, knobs);
+    const inLoop = through(powerampModule, boost(pre, 3), knobs);
+    const afterAmp = boost(through(powerampModule, pre, knobs), 3);
+    expect(peak(inLoop)).toBeLessThanOrEqual(knobs.master); // the output tubes clip it
+    expect(peak(afterAmp)).toBeGreaterThan(1.5 * knobs.master); // nothing stops it
   });
 });
