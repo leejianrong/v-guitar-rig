@@ -139,7 +139,16 @@ test("a preset that needs a module this rig does not have says which and changes
   await page.goto(url);
   await expect(page.getByTestId("daemon")).toContainText("connected");
   const pedals = page.locator("[data-testid^=pedal-]");
-  const before = await pedals.count();
+  // the page lists the daemon's board only once it has arrived: wait for that before counting
+  const saved = await page.evaluate(async () => {
+    const token = document.querySelector<HTMLMetaElement>("meta[name=rig-token]")?.content;
+    const res = await fetch("/api/boards/default", {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    return ((await res.json()) as { slots: unknown[] }).slots.length;
+  });
+  await expect(pedals).toHaveCount(saved);
+  const before = saved;
   await page.getByRole("button", { name: "Load preset Needs Ghost" }).click();
   await expect(page.getByTestId("preset-notice")).toContainText("missing ghost@1");
   await expect(pedals).toHaveCount(before); // the board is as it was
