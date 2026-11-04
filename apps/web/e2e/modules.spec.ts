@@ -118,3 +118,29 @@ test("a module that goes bad while playing is bypassed and the board keeps playi
   await page.getByRole("button", { name: "Listen here: Output" }).click();
   await expect.poll(() => page.evaluate(() => window.__rig?.level(110))).toBeGreaterThan(-30);
 });
+
+test("a preset that needs a module this rig does not have says which and changes nothing", async ({
+  page,
+}) => {
+  await page.route("**/api/presets", async (route) => {
+    const res = await route.fetch();
+    const body = await res.json();
+    body.presets.push({
+      schema: 1,
+      id: "needs-ghost",
+      name: "Needs Ghost",
+      description: "uses a module that is not here",
+      tags: ["ghostly"],
+      rev: 0,
+      slots: [{ id: "g", module: "ghost@1", bypass: false, params: {} }],
+    });
+    await route.fulfill({ response: res, json: body });
+  });
+  await page.goto(url);
+  await expect(page.getByTestId("daemon")).toContainText("connected");
+  const pedals = page.locator("[data-testid^=pedal-]");
+  const before = await pedals.count();
+  await page.getByRole("button", { name: "Load preset Needs Ghost" }).click();
+  await expect(page.getByTestId("preset-notice")).toContainText("missing ghost@1");
+  await expect(pedals).toHaveCount(before); // the board is as it was
+});

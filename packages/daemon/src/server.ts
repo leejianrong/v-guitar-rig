@@ -164,7 +164,10 @@ export async function startServer(opts: ServeOptions): Promise<Running> {
         if (!Number.isInteger(body.expectedRev))
           return send(res, 422, { error: "invalid", errors: ["`expectedRev` must be an integer"] });
         const r = store.putPreset(id, body.preset, body.expectedRev as number);
-        if (r.ok) return send(res, 200, r.preset);
+        if (r.ok) {
+          broadcast({ id: r.preset.id, rev: r.preset.rev }, "presets");
+          return send(res, 200, r.preset);
+        }
         if (r.kind === "stale") return send(res, 409, { error: "stale_rev", current: r.current });
         return send(res, 422, { error: "invalid", errors: r.errors });
       }

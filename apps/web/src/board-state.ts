@@ -21,7 +21,7 @@ export function useBoard() {
   const [board, setBoard] = useState<Board>(STANDALONE);
   const [link, setLink] = useState<Link>("standalone");
   const [notice, setNotice] = useState<string | null>(null);
-  const [modulesTick, setModulesTick] = useState(0); // bumps when the daemon stores a module
+  const [changeTick, setChangeTick] = useState(0); // bumps when the daemon stores a module or preset
   const cur = useRef(board);
   const dirty = useRef(false);
   const saving = useRef(false);
@@ -81,8 +81,8 @@ export function useBoard() {
             const lines = buf.slice(0, i).split("\n");
             const line = lines.find((l) => l.startsWith("data: "));
             buf = buf.slice(i + 2);
-            if (lines.includes("event: modules")) {
-              setModulesTick((t) => t + 1);
+            if (lines.includes("event: modules") || lines.includes("event: presets")) {
+              setChangeTick((t) => t + 1);
               continue;
             }
             if (!line || dirty.current) continue;
@@ -107,5 +107,5 @@ export function useBoard() {
     [flush],
   );
 
-  return { board, link, notice, modulesTick, dismissNotice: () => setNotice(null), edit };
+  return { board, link, notice, changeTick, dismissNotice: () => setNotice(null), edit };
 }
