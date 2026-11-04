@@ -3,7 +3,7 @@ import type { Riff, Slot } from "@rig/shared";
 import wasmUrl from "../../../target/wasm32-unknown-unknown/release/rig_core.wasm?url";
 import workletUrl from "./worklet.ts?worker&url";
 
-export type Source = "tone" | "guitar" | "riff";
+export type Source = "tone" | "guitar" | "riff" | "file";
 
 let wasm: Promise<WebAssembly.Module> | null = null;
 export const loadWasm = () => {
@@ -98,12 +98,15 @@ export class Rig {
     sources: string[],
     level: number,
     volume: number,
+    file?: File,
   ): Promise<Rig> {
     const ctx = new AudioContext({ sampleRate: 48000, latencyHint: "interactive" });
     await ctx.audioWorklet.addModule(workletUrl);
     const node = new AudioWorkletNode(ctx, "rig-processor", {
       numberOfInputs: 1,
       outputChannelCount: [2],
+      channelCount: 1, // a stereo file is mixed down to one signal, not read from its left channel only
+      channelCountMode: "explicit",
     });
     const ready = new Promise<void>((resolve) => {
       node.port.onmessage = (e) => e.data.type === "ready" && resolve();
@@ -127,6 +130,12 @@ export class Rig {
         },
       });
       src = ctx.createMediaStreamSource(stream);
+    } else if (source === "file") {
+      const player = ctx.createBufferSource();
+      player.buffer = await ctx.decodeAudioData(await (file as File).arrayBuffer());
+      player.loop = true;
+      player.start();
+      src = player;
     } else if (source === "riff") {
       src = ctx.createGain(); // silent: the worklet plays the virtual guitar itself
     } else {
