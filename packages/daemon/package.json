@@ -7,10 +7,10 @@
     "rig": "dist/rig.mjs"
   },
   "scripts": {
-    "build": "esbuild src/main.ts --bundle --platform=node --format=esm --target=node24 --outfile=dist/rig.mjs",
+    "build": "esbuild src/main.ts --bundle --platform=node --format=esm --target=node24 --outfile=dist/rig.mjs && esbuild src/sandbox-child.ts --bundle --platform=node --format=esm --target=node24 --outfile=dist/sandbox.mjs",
     "typecheck": "tsc -p .",
     "test": "vitest run",
-    "test:int": "vitest run --config vitest.int.config.ts"
+    "test:int": "pnpm build && vitest run --config vitest.int.config.ts"
   },
   "dependencies": {
     "@rig/dsp-host": "workspace:*",

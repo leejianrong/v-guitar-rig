@@ -59,7 +59,7 @@ A web app (plus local daemon) where you plug a guitar into your audio interface 
 | S1 | Rust DSP core compiled to WASM (solver, convolver, oversampler) hosted in an AudioWorklet and in Node | ADR-0001 |
 | S2 | Daemon: single write path HTTP → validate → rev check → persist file → broadcast over server-sent events; MCP and CLI call it | ADR-0002 |
 | S3 | Module registry with three kinds sharing one param schema | ADR-0003 |
-| S4 | Safety gate and sandbox: worklet scope, Node worker with permissions, stability tests, auto-bypass, master limiter | ADR-0004 |
+| S4 | Safety gate and sandbox: worklet scope, sandbox process (Node permission model + bare vm realm), stability tests, auto-bypass, master limiter | ADR-0004 |
 | S5 | Analysis taps (ring buffer) and host-drawn visuals on the main thread / OffscreenCanvas | ADR-0005 |
 | S6 | Offline renderer plus descriptor extraction; preset search by tags | ADR-0006 |
 | S7 | Netlist compiler → MNA/Newton solver in the Rust core | ADR-0007 |

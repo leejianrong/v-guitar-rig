@@ -77,7 +77,9 @@ export function gateModule(
         const [m, t] = [rms(mid), rms(tail)];
         if (t > GROWTH * m && t > 0.05) return fail("output keeps growing");
       } catch (e) {
-        return fail(`threw "${e instanceof Error ? e.message : String(e)}"`);
+        return fail(
+          `threw "${String((e as { message?: unknown } | null)?.message ?? e).slice(0, 200)}"`,
+        );
       }
     }
   }

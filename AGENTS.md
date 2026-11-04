@@ -23,7 +23,7 @@ Trust the code over the docs where they disagree, and fix the docs in the same P
 - `crates/rig-core` must stay free of browser/OS calls (ADR-0001): the same code runs in an AudioWorklet and in Node.
 - AudioWorklet scope has no `TextEncoder`, `performance` or DOM. Anything imported by `apps/web/src/worklet.ts` (including `packages/dsp-host`) must avoid them.
 - The daemon is the only writer of board files (ADR-0002); boards carry `rev` and stale writes get 409/exit 3. Keep `127.0.0.1` binding and the Host check: compose publishes loopback only.
-- Generated module code is untrusted (ADR-0004). No secrets in git; `.env*` is ignored.
+- Generated module code is untrusted (ADR-0004): `compileModule`/`gateModule` execute it, so only call them with a `Realm` inside the sandbox process (`packages/daemon/src/sandbox*.ts`), never in the daemon. The daemon build makes two bundles (`rig.mjs`, `sandbox.mjs`); keep both in the image. No secrets in git; `.env*` is ignored.
 - Biome does not read `.gitignore`: new generated output folders must be added to `biome.json` excludes.
 - pnpm 11 blocks dependency build scripts; allow them in `pnpm-workspace.yaml` `allowBuilds`.
 
