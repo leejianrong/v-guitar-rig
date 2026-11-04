@@ -1,9 +1,9 @@
 import { BLOCK, Chain, type Fault } from "@rig/dsp-host";
-import type { Slot } from "@rig/shared";
+import type { Riff, Slot } from "@rig/shared";
 import wasmUrl from "../../../target/wasm32-unknown-unknown/release/rig_core.wasm?url";
 import workletUrl from "./worklet.ts?worker&url";
 
-export type Source = "tone" | "guitar";
+export type Source = "tone" | "guitar" | "riff";
 
 let wasm: Promise<WebAssembly.Module> | null = null;
 export const loadWasm = () => {
@@ -68,6 +68,7 @@ export class Rig {
     private readonly level: GainNode,
     private readonly volume: GainNode,
     private readonly stream: MediaStream | null,
+    private readonly synth: boolean,
   ) {
     this.ctx = ctx;
     this.sampleRate = ctx.sampleRate;
@@ -122,12 +123,15 @@ export class Rig {
         },
       });
       src = ctx.createMediaStreamSource(stream);
+    } else if (source === "riff") {
+      src = ctx.createGain(); // silent: the worklet plays the virtual guitar itself
     } else {
       const osc = ctx.createOscillator();
       osc.frequency.value = 110;
       osc.start();
       src = osc;
     }
+    node.port.postMessage({ type: "input", synth: source === "riff", level });
     src.connect(gain);
     gain.connect(node);
     // master limiter (ADR-0004): a hard ceiling before the speakers
@@ -142,7 +146,7 @@ export class Rig {
     limiter.connect(out);
     out.connect(ctx.destination);
     await ctx.resume();
-    return new Rig(ctx, node, gain, out, stream);
+    return new Rig(ctx, node, gain, out, stream, source === "riff");
   }
 
   /** Silence everything and release the audio device and microphone. The Rig cannot be restarted. */
@@ -171,6 +175,11 @@ export class Rig {
   }
   setLevel(v: number) {
     this.level.gain.value = v;
+    this.node.port.postMessage({ type: "input", synth: this.synth, level: v });
+  }
+  /** Play `riff` on the virtual guitar (looping), or stop with null. Only for the riff source. */
+  playRiff(riff: Riff | null) {
+    this.node.port.postMessage({ type: "riff", riff, loop: true });
   }
   setVolume(v: number) {
     this.volume.gain.value = v;
