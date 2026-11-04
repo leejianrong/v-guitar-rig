@@ -989,3 +989,27 @@ h1 {
     0 0 14px rgba(0, 0, 0, 0.8);
   opacity: 0.8;
 }
+
+/* the wah's treadle: a ridged rubber plate that tips from heel to toe */
+.pedal.wah {
+  height: 440px;
+}
+.treadle {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+}
+.treadle-plate {
+  width: 112px;
+  height: 92px;
+  border-radius: 12px;
+  cursor: ns-resize;
+  touch-action: none;
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.55) 0 3px, rgba(255, 255, 255, 0.07) 3px 6px),
+    #1b1d21;
+  box-shadow:
+    0 0 0 3px #aeb4bc,
+    0 0 0 4px rgba(0, 0, 0, 0.5),
+    0 8px 14px rgba(0, 0, 0, 0.55);
+}

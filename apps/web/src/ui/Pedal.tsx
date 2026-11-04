@@ -2,6 +2,7 @@ import type { ModuleInfo } from "@rig/dsp-host";
 import type { Slot } from "@rig/shared";
 import { finishFor } from "./finish";
 import { Knob } from "./Knob";
+import { Treadle } from "./Treadle";
 
 /** What any box on the board needs: the pedal, an amp panel and the speaker cabinet share it. */
 export interface UnitProps {
@@ -36,7 +37,7 @@ export function Pedal({
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: mouse shortcut; the Inspect button is the keyboard route
     <article
-      className={`pedal${on ? "" : " off"}${selected ? " selected" : ""}`}
+      className={`pedal${on ? "" : " off"}${selected ? " selected" : ""}${def.id === "wah@1" ? " wah" : ""}`}
       style={{ "--finish": finish, "--ink": ink } as React.CSSProperties}
       data-testid={`pedal-${def.id}`}
       onClick={(e) => {
@@ -89,16 +90,32 @@ export function Pedal({
       >
         {def.name}
       </h3>
-      <div className={`knobs k${def.params.length}`}>
-        {def.params.map((p) => (
-          <Knob
-            key={p.id}
-            spec={p}
-            value={slot.params[p.id] ?? p.default}
-            onChange={(v) => onParam(p.id, v)}
-          />
-        ))}
-      </div>
+      {(() => {
+        // a wah's position is the treadle, not a knob
+        const rocker = def.id === "wah@1" ? def.params.find((p) => p.id === "pedal") : undefined;
+        const knobs = def.params.filter((p) => p !== rocker);
+        return (
+          <>
+            <div className={`knobs k${knobs.length}`}>
+              {knobs.map((p) => (
+                <Knob
+                  key={p.id}
+                  spec={p}
+                  value={slot.params[p.id] ?? p.default}
+                  onChange={(v) => onParam(p.id, v)}
+                />
+              ))}
+            </div>
+            {rocker && (
+              <Treadle
+                spec={rocker}
+                value={slot.params[rocker.id] ?? rocker.default}
+                onChange={(v) => onParam(rocker.id, v)}
+              />
+            )}
+          </>
+        );
+      })()}
       {fault && (
         <p className="fault" role="alert">
           Bypassed: {fault}

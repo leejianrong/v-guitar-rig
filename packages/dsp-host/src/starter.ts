@@ -1,6 +1,7 @@
 import { amp, powerampModule, preampModule } from "./amp";
 import { cab } from "./cab";
 import type { ModuleDef, Processor } from "./modules";
+import { wah } from "./wah";
 
 const TWO_PI = 2 * Math.PI;
 const lp = (hz: number, sr: number) => 1 - Math.exp((-TWO_PI * hz) / sr);
@@ -218,6 +219,7 @@ const gate: ModuleDef = {
 };
 
 export const STARTER: ModuleDef[] = [
+  wah,
   overdrive,
   fuzz,
   delay,

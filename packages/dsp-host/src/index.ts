@@ -12,3 +12,4 @@ export * from "./presets";
 export * from "./probe";
 export * from "./render";
 export * from "./riffs";
+export { wahHz } from "./wah";
