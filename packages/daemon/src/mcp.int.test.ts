@@ -69,7 +69,14 @@ describe("MCP server", () => {
   it("lists the tools and serves the workflow prompt", async () => {
     const tools = ((await rpc("tools/list")).result as { tools: { name: string }[] }).tools;
     expect(tools.map((t) => t.name)).toEqual(
-      expect.arrayContaining(["list_modules", "new_module", "set_board", "render"]),
+      expect.arrayContaining([
+        "list_modules",
+        "new_module",
+        "set_board",
+        "render",
+        "list_presets",
+        "set_preset",
+      ]),
     );
     const prompt = (await rpc("prompts/get", { name: "build-a-pedal" })).result as {
       messages: { content: { text: string } }[];

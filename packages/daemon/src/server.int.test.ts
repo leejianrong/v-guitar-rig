@@ -369,3 +369,49 @@ describe("modules", () => {
     expect(decodeWav(readFileSync(out)).samples.length).toBe(48000);
   });
 });
+
+describe("presets", () => {
+  const preset = {
+    schema: 1,
+    id: "test-crunch",
+    name: "Test Crunch",
+    description: "A preset for the test.",
+    tags: ["genre:blues", "warm"],
+    rev: 0,
+    slots: [{ id: "a", module: "overdrive@1", bypass: false, params: { drive: 9 } }],
+  };
+  const file = (name: string, body: unknown) => {
+    writeFileSync(join(dir, name), JSON.stringify(body));
+    return name;
+  };
+
+  it("round-trips through the CLI and the API, and a stale write is exit 3", async () => {
+    const made = await cli(["preset", "new", file("p.json", preset)]);
+    expect(made.code).toBe(EXIT.ok);
+    const got = (await (await api("/api/presets/test-crunch")).json()) as typeof preset;
+    expect(got.slots[0]?.params.drive).toBe(9);
+    expect(
+      ((await (await api("/api/presets")).json()) as { presets: unknown[] }).presets,
+    ).toHaveLength(1);
+    expect((await cli(["preset", "get", "test-crunch"])).out).toContain("Test Crunch");
+
+    expect((await cli(["preset", "new", file("p.json", preset), "--expected-rev", "5"])).code).toBe(
+      EXIT.staleRev,
+    );
+    expect((await cli(["preset", "new", file("p.json", preset), "--expected-rev", "0"])).code).toBe(
+      EXIT.ok,
+    );
+  });
+
+  it("refuses bad tags and unknown modules with exit 2", async () => {
+    const badTag = file("t.json", { ...preset, id: "bad-tag", tags: ["Not A Slug"] });
+    expect((await cli(["preset", "new", badTag])).code).toBe(EXIT.validation);
+    const noMod = file("m.json", {
+      ...preset,
+      id: "no-mod",
+      slots: [{ id: "a", module: "ghost@1", bypass: false, params: {} }],
+    });
+    expect((await cli(["preset", "new", noMod])).code).toBe(EXIT.validation);
+    expect((await api("/api/presets/bad-tag")).status).toBe(404);
+  });
+});

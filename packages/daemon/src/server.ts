@@ -147,6 +147,24 @@ export async function startServer(opts: ServeOptions): Promise<Running> {
         return send(res, 422, { error: "invalid", errors: r.errors });
       }
     }
+    if (parts[1] === "presets") {
+      if (parts.length === 2 && method === "GET")
+        return send(res, 200, { presets: store.listPresets() });
+      const id = parts[2];
+      if (id && parts.length === 3 && method === "GET") {
+        const p = store.getPreset(id);
+        return p ? send(res, 200, p) : send(res, 404, { error: "not_found" });
+      }
+      if (id && parts.length === 3 && method === "PUT") {
+        const body = (await readJson(req)) as { expectedRev?: unknown; preset?: unknown };
+        if (!Number.isInteger(body.expectedRev))
+          return send(res, 422, { error: "invalid", errors: ["`expectedRev` must be an integer"] });
+        const r = store.putPreset(id, body.preset, body.expectedRev as number);
+        if (r.ok) return send(res, 200, r.preset);
+        if (r.kind === "stale") return send(res, 409, { error: "stale_rev", current: r.current });
+        return send(res, 422, { error: "invalid", errors: r.errors });
+      }
+    }
     if (parts[1] === "modules") {
       const id = parts[2] && decodeURIComponent(parts[2]);
       if (parts.length === 2 && method === "GET") {

@@ -87,6 +87,22 @@ const TOOLS = [
     ),
   },
   {
+    name: "list_presets",
+    description: "Saved presets: a board's slots plus name, description and tags.",
+    inputSchema: obj({}),
+  },
+  {
+    name: "get_preset",
+    description: "One preset with its slots.",
+    inputSchema: obj({ id: str("preset id") }, ["id"]),
+  },
+  {
+    name: "set_preset",
+    description:
+      "Save a preset (id, name, description, 1-16 tags such as artist:name, era:70s, dreamy, and slots). expectedRev is 0 for a new one, else its current rev.",
+    inputSchema: obj({ preset: { type: "object" }, expectedRev: { type: "number" } }, ["preset"]),
+  },
+  {
     name: "render",
     description:
       "Render a board over a guitar-like test clip and return level, peak and descriptors: rmsDb, peakDb, crestDb, centroidHz, rolloffHz, bandsDb, thdPercent.",
@@ -119,6 +135,18 @@ const route = (name: string, a: Args): [string, string, unknown?] | null => {
         "PUT",
         `/api/boards/${encodeURIComponent(String(board?.id ?? "default"))}`,
         { expectedRev: a.expectedRev ?? board?.rev, board },
+      ];
+    }
+    case "list_presets":
+      return ["GET", "/api/presets"];
+    case "get_preset":
+      return ["GET", `/api/presets/${id}`];
+    case "set_preset": {
+      const preset = a.preset as { id?: string; rev?: number };
+      return [
+        "PUT",
+        `/api/presets/${encodeURIComponent(String(preset?.id ?? ""))}`,
+        { expectedRev: a.expectedRev ?? preset?.rev ?? 0, preset },
       ];
     }
     case "render":

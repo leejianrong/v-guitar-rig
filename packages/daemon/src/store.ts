@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { KNOWN_MODULES } from "@rig/dsp-host";
-import { type Board, validateBoard } from "@rig/shared";
+import { type Board, type Preset, validateBoard, validatePreset } from "@rig/shared";
 import type { ModuleInfo } from "./sandbox";
 
 export type PutResult =
@@ -17,6 +17,12 @@ export type PutModuleResult =
   | { ok: true; module: StoredModule }
   | { ok: false; kind: "stale"; current: StoredModule };
 
+export type PutPresetResult =
+  | { ok: true; preset: Preset }
+  | { ok: false; kind: "stale"; current: Preset }
+  | { ok: false; kind: "invalid"; errors: string[] };
+
+const SLUG = /^[a-z0-9][a-z0-9-]*$/;
 const MODULE_ID = /^[a-z][a-z0-9-]{0,40}@[1-9][0-9]{0,3}$/;
 
 /**
@@ -26,12 +32,15 @@ const MODULE_ID = /^[a-z][a-z0-9-]{0,40}@[1-9][0-9]{0,3}$/;
 export class RigStore {
   private readonly boardsDir: string;
   private readonly modulesDir: string;
+  private readonly presetsDir: string;
 
   constructor(readonly rigDir: string) {
     this.boardsDir = join(rigDir, "boards");
     this.modulesDir = join(rigDir, "modules");
     mkdirSync(this.boardsDir, { recursive: true });
+    this.presetsDir = join(rigDir, "presets");
     mkdirSync(this.modulesDir, { recursive: true });
+    mkdirSync(this.presetsDir, { recursive: true });
     if (this.listBoards().length === 0) {
       this.write({
         schema: 1,
@@ -88,6 +97,47 @@ export class RigStore {
     const next: Board = { ...v.board, rev: (current?.rev ?? -1) + 1 };
     this.write(next);
     return { ok: true, board: next };
+  }
+
+  listPresets(): Preset[] {
+    return readdirSync(this.presetsDir)
+      .filter((f) => f.endsWith(".json"))
+      .map((f) => this.getPreset(f.slice(0, -5)))
+      .filter((p): p is Preset => p !== null);
+  }
+
+  getPreset(id: string): Preset | null {
+    if (!SLUG.test(id)) return null;
+    try {
+      const v = validatePreset(
+        JSON.parse(readFileSync(join(this.presetsDir, `${id}.json`), "utf8")),
+        this.knownModules(),
+      );
+      return v.ok ? v.preset : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Same rule as boards: a stale `expectedRev` is rejected, a new preset is written with 0. */
+  putPreset(id: string, preset: unknown, expectedRev: number): PutPresetResult {
+    const v = validatePreset(preset, this.knownModules());
+    if (!v.ok) return { ok: false, kind: "invalid", errors: v.errors };
+    if (v.preset.id !== id)
+      return { ok: false, kind: "invalid", errors: ["preset id does not match the URL"] };
+    const current = this.getPreset(id);
+    if (current && current.rev !== expectedRev) return { ok: false, kind: "stale", current };
+    if (!current && expectedRev !== 0)
+      return {
+        ok: false,
+        kind: "invalid",
+        errors: ["new presets must be written with expectedRev 0"],
+      };
+    const next: Preset = { ...v.preset, rev: (current?.rev ?? -1) + 1 };
+    const tmp = join(this.presetsDir, `${id}.json.tmp`);
+    writeFileSync(tmp, `${JSON.stringify(next, null, 2)}\n`);
+    renameSync(tmp, join(this.presetsDir, `${id}.json`));
+    return { ok: true, preset: next };
   }
 
   /** Built-in modules plus those stored here: what a board may refer to. */
