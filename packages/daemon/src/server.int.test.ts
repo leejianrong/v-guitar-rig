@@ -137,6 +137,19 @@ describe("live updates", () => {
 });
 
 describe("render", () => {
+  it("returns the same descriptors every time for the same board and input", async () => {
+    const run = async () =>
+      (
+        (await (
+          await api("/api/render", { method: "POST", body: JSON.stringify({ seconds: 1 }) })
+        ).json()) as { descriptors: Record<string, unknown> }
+      ).descriptors;
+    const [a, b] = [await run(), await run()];
+    expect(a).toEqual(b);
+    expect(a).toMatchObject({ thdPercent: expect.any(Number), centroidHz: expect.any(Number) });
+    expect(a.thdPercent as number).toBeGreaterThan(1); // the default board's diode clipper distorts a tone
+  });
+
   it("renders the default board through the API", async () => {
     const r = (await (
       await api("/api/render", { method: "POST", body: JSON.stringify({ seconds: 1 }) })
@@ -217,6 +230,15 @@ describe("cli against the daemon", () => {
     ).json()) as { wav: string };
     const w2 = decodeWav(Buffer.from(api2.wav, "base64"));
     expect(w2.samples).toEqual(w.samples);
+    const printed = JSON.parse(r.out) as { descriptors: { rmsDb: number; bandsDb: object } };
+    expect(printed.descriptors.rmsDb).toBeLessThan(0);
+    expect(Object.keys(printed.descriptors.bandsDb)).toEqual([
+      "low",
+      "lowMid",
+      "mid",
+      "high",
+      "air",
+    ]);
   });
 
   it("render of an unknown board exits 2", async () => {

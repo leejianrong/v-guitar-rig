@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { KNOWN_MODULES, ModuleError, renderBoard } from "@rig/dsp-host";
+import { describeBoard, KNOWN_MODULES, ModuleError, renderBoard } from "@rig/dsp-host";
 import { type Board, testClip, validateBoard } from "@rig/shared";
 import { startServer } from "./server";
 import { RigStore } from "./store";
@@ -114,20 +114,15 @@ export async function runCli(argv: string[], io: Io): Promise<number> {
         input = w.samples;
         sampleRate = w.sampleRate;
       }
-      const out = renderBoard(
-        new WebAssembly.Module(readFileSync(wasmPath(io))),
-        board,
-        input,
-        sampleRate,
-      );
+      const wasm = new WebAssembly.Module(readFileSync(wasmPath(io)));
+      const out = renderBoard(wasm, board, input, sampleRate);
       writeFileSync(resolve(io.cwd, outPath), encodeWav(out, sampleRate));
-      let peak = 0;
-      for (const v of out) peak = Math.max(peak, Math.abs(v));
-      const summary = { out: outPath, frames: out.length, sampleRate, peak };
+      const descriptors = describeBoard(wasm, board, out, sampleRate);
+      const summary = { out: outPath, frames: out.length, sampleRate, descriptors };
       io.out(
         json
           ? `${JSON.stringify(summary)}\n`
-          : `wrote ${outPath} (${out.length} frames, peak ${peak.toFixed(3)})\n`,
+          : `wrote ${outPath} (${out.length} frames, peak ${descriptors.peakDb} dB, centroid ${descriptors.centroidHz} Hz, THD ${descriptors.thdPercent}%)\n`,
       );
       return EXIT.ok;
     }
