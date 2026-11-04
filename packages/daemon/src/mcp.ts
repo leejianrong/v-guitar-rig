@@ -38,6 +38,15 @@ Workflow:
    Descriptors: rmsDb, peakDb, crestDb (peak minus rms); centroidHz (spectral centre, lower = darker); rolloffHz (below it lies 85% of the energy); bandsDb in dB relative to the total over low 20-200 Hz, lowMid 200-800, mid 800-3k, high 3k-8k, air 8k+; tailMs (ms a tone rings on after you stop, to -60 dB; 6000 is the cap); thdPercent (energy at harmonics 2-8 of a 110 Hz tone, so a drive raises it, and a comb-like delay or chorus changes it too, so only trust it for drive). Expected moves: more drive raises thdPercent and lowers crestDb; a darker tone lowers centroidHz and the high and air bands; more wet delay or reverb raises rmsDb and may raise crestDb as echoes add to peaks. Adjust params or code and repeat.
 Output must stay finite and at or below 8x full scale on the gate's tests (impulse, noise, square, DC, at default, minimum and maximum knobs), and not grow over time, or the module is rejected. A master limiter is always on.`;
 
+/** Where to start for any request about a sound, served as the `find-a-tone` prompt. */
+export const FIND_A_TONE = `The player asked for a sound ("sound like David Gilmour", "make it spacier"). Start from a preset, not from code.
+
+1. search_presets with their words. Each hit lists the tags that matched; read the description and pick the best. If nothing matches, say so, then pick the closest by tags with list_presets, or go to step 5.
+2. get_preset for the winner, then get_board and set_board with the board's slots replaced by the preset's slots (keep the board's id, name and rev). The open UI shows it at once.
+3. render and read the descriptors to confirm it is what the preset says it is (a clean preset has a low thdPercent, a high-gain one a high thdPercent).
+4. Tune it: apply the tone guide (prompts/get tune-a-tone) for words like spacier, then render again and check the descriptor moved. Keep peakDb below 0. Tell the player what you changed and what the numbers did.
+5. Only if no preset or built-in module can give the sound, write a new module (prompts/get build-a-pedal), add it to the board, and tune it the same way.`;
+
 /** How to nudge a loaded board by tone words, served as the `tune-a-tone` prompt. */
 export const TONE_GUIDE = `Tuning a board by tone words: change a few knobs, render, and read the descriptor that should move.
 
@@ -47,6 +56,12 @@ ${TONE_RULES.spacier.steps
   .join("\n")}
 
 Other words: change one or two knobs and read the descriptor that should move: centroidHz for bright or dark, thdPercent for gain, tailMs for space. tailMs is how long a tone rings on after you stop playing, measured to -60 dB.`;
+
+const PROMPTS: Record<string, string> = {
+  "find-a-tone": FIND_A_TONE,
+  "tune-a-tone": TONE_GUIDE,
+  "build-a-pedal": WORKFLOW,
+};
 
 const obj = (properties: Args, required: string[] = []) => ({
   type: "object",
@@ -199,19 +214,18 @@ export async function handle(call: Call, msg: { id?: unknown; method: string; pa
     case "prompts/list":
       return reply({
         prompts: [
+          {
+            name: "find-a-tone",
+            description: "Start here: from a request to a tuned board, presets first.",
+          },
           { name: "build-a-pedal", description: "How to write, test and play a new pedal." },
           { name: "tune-a-tone", description: "How to nudge a board with words like spacier." },
         ],
       });
     case "prompts/get":
-      return p.name === "build-a-pedal" || p.name === "tune-a-tone"
+      return PROMPTS[String(p.name)]
         ? reply({
-            messages: [
-              {
-                role: "user",
-                content: { type: "text", text: p.name === "tune-a-tone" ? TONE_GUIDE : WORKFLOW },
-              },
-            ],
+            messages: [{ role: "user", content: { type: "text", text: PROMPTS[String(p.name)] } }],
           })
         : fail(-32602, `no prompt ${String(p.name)}`);
     case "tools/call": {
