@@ -1,6 +1,6 @@
+import { levelNear, powerDb } from "@rig/dsp-host";
 import { useEffect, useRef } from "react";
 import type { Rig } from "../audio";
-import { levelNear, powerDb } from "../fft";
 
 const F_MIN = 40;
 const F_MAX = 16000;
