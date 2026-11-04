@@ -68,3 +68,20 @@ describe("preset loudness", () => {
     expect(Math.max(...means) - Math.min(...means)).toBeLessThan(2);
   });
 });
+
+describe("preset layout", () => {
+  it("puts chorus, delay and reverb in the amp's effects loop and nothing but the cab after the power amp", () => {
+    for (const p of STARTER_PRESETS) {
+      const order = p.slots.map((s) => s.module);
+      const [pre, power] = [order.indexOf("preamp@1"), order.indexOf("poweramp@1")];
+      expect(pre, `${p.id} preamp`).toBeGreaterThanOrEqual(0);
+      expect(power, `${p.id} power amp`).toBeGreaterThan(pre);
+      expect(order, `${p.id} has no one-piece amp`).not.toContain("amp@1");
+      expect(order.slice(power + 1), `${p.id} after the power amp`).toEqual(["cab@1"]);
+      for (const m of ["chorus@1", "delay@1", "reverb@1"].filter((m) => order.includes(m)))
+        expect(order.indexOf(m), `${p.id} ${m}`).toBeGreaterThan(pre);
+      for (const m of ["overdrive@1", "fuzz@1", "noise-gate@1"].filter((m) => order.includes(m)))
+        expect(order.indexOf(m), `${p.id} ${m}`).toBeLessThan(pre);
+    }
+  });
+});
