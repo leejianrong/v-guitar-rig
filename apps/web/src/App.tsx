@@ -2,7 +2,7 @@ import type { Fault } from "@rig/dsp-host";
 import { useEffect, useRef, useState } from "react";
 import { benchmarkHeadroom, loadWasm, Rig, type Source } from "./audio";
 import { useBoard } from "./board-state";
-import { useCatalog } from "./catalog";
+import { missingModules, slotsOf, useCatalog, usePresets } from "./catalog";
 import { FrameCounter } from "./frames";
 import { renderOffline } from "./offline";
 import { Board, tapLabel } from "./ui/Board";
@@ -11,8 +11,10 @@ import { Library } from "./ui/Library";
 import { levelAt, Scope } from "./ui/Scope";
 
 export function App() {
-  const { board, link, notice, modulesTick, dismissNotice, edit } = useBoard();
-  const { catalog, sources } = useCatalog(link === "connected", modulesTick);
+  const { board, link, notice, changeTick, dismissNotice, edit } = useBoard();
+  const { catalog, sources } = useCatalog(link === "connected", changeTick);
+  const presets = usePresets(link === "connected", changeTick);
+  const [blocked, setBlocked] = useState<string | null>(null);
   const [rig, setRig] = useState<Rig | null>(null);
   const [source, setSource] = useState<Source>("tone");
   const [level, setLevel] = useState(0.9);
@@ -145,6 +147,15 @@ export function App() {
         <output className="status">{status}</output>
       </header>
 
+      {blocked && (
+        <output className="notice" data-testid="preset-notice">
+          {blocked}{" "}
+          <button type="button" onClick={() => setBlocked(null)}>
+            Dismiss
+          </button>
+        </output>
+      )}
+
       {notice && (
         <output className="notice">
           {notice}{" "}
@@ -157,6 +168,17 @@ export function App() {
       <div className="stage">
         <Library
           catalog={catalog}
+          presets={presets}
+          onLoad={(p) => {
+            const missing = missingModules(p, catalog);
+            if (missing.length > 0) {
+              setBlocked(`Cannot load ${p.name}: this rig is missing ${missing.join(", ")}.`);
+              return;
+            }
+            setBlocked(null);
+            edit(() => slotsOf(p));
+            select(null);
+          }}
           onAdd={(id) =>
             edit((s) => [...s, { id: crypto.randomUUID(), module: id, bypass: false, params: {} }])
           }

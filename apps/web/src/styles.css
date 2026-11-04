@@ -576,3 +576,14 @@ select {
   color: var(--muted);
   font-size: 0.85rem;
 }
+
+.shelf ul.presets {
+  grid-template-columns: 1fr;
+  margin: 8px 0 16px;
+  gap: 6px;
+}
+.shelf .presets li button {
+  justify-items: start;
+  padding: 7px 10px;
+  text-align: left;
+}

@@ -1,3 +1,4 @@
+import type { Preset } from "@rig/shared";
 import type { Catalog } from "../catalog";
 import { finishFor } from "./finish";
 
@@ -24,13 +25,38 @@ function Thumb({ id, name, knobs }: { id: string; name: string; knobs: number })
 
 export function Library({
   catalog,
+  presets,
+  onLoad,
   onAdd,
 }: {
   catalog: Catalog;
+  presets: Preset[];
+  onLoad: (preset: Preset) => void;
   onAdd: (moduleId: string) => void;
 }) {
   return (
     <aside className="shelf" aria-label="Pedal shelf">
+      <h2>Presets</h2>
+      <ul className="presets">
+        {presets.map((p) => (
+          <li key={p.id}>
+            <button
+              type="button"
+              onClick={() => onLoad(p)}
+              aria-label={`Load preset ${p.name}`}
+              title={p.description}
+            >
+              <span className="shelf-name">{p.name}</span>
+              <span className="cat">
+                {p.tags
+                  .filter((t) => !t.includes(":"))
+                  .slice(0, 3)
+                  .join(" · ")}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
       <h2>Shelf</h2>
       <ul>
         {Object.values(catalog).map((m) => (
