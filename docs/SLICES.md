@@ -126,7 +126,7 @@ Stories are on Pandan board VGR, epic VGR-E4 (25 points).
 
 #### End-to-end
 
-- With six modules active the UI holds >= 55 fps average over 60 s while audio has zero underruns.
+- With six modules active the UI holds >= 55 fps average over 60 s (asserted). Zero underruns is a manual check on real hardware (docs/hardware-checks.md): headless Chromium on WSL2 reports underruns even idle, so asserting it there would measure the environment.
 - The transfer curve of a hard clipper shows the declared clip level within 1 dB.
 
 #### Integration

@@ -1,7 +1,8 @@
 import { type Fault, MODULES } from "@rig/dsp-host";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { benchmarkHeadroom, loadWasm, Rig, type Source } from "./audio";
 import { useBoard } from "./board-state";
+import { FrameCounter } from "./frames";
 import { renderOffline } from "./offline";
 import { Board, tapLabel } from "./ui/Board";
 import { Inspector, pairLevels } from "./ui/Inspector";
@@ -18,6 +19,11 @@ export function App() {
   const [faults, setFaults] = useState<Fault[]>([]);
   const [status, setStatus] = useState("Idle");
   const [headroom, setHeadroom] = useState<number | null>(null);
+  const [perf, setPerf] = useState<{ fps: number; underruns: number | null }>({
+    fps: 0,
+    underruns: 0,
+  });
+  const frames = useRef(new FrameCounter());
   const [loop, setLoop] = useState("not measured (needs a cable from interface output to input)");
   const [selectedId, select] = useState<string | null>(null);
   const slots = board.slots;
@@ -43,6 +49,19 @@ export function App() {
     ];
     return () => {
       for (const o of offs) o();
+    };
+  }, [rig]);
+
+  useEffect(() => {
+    if (!rig) return;
+    const counter = frames.current;
+    counter.start();
+    const read = () => ({ fps: counter.fps(), underruns: rig.underruns });
+    window.__rigStats = read;
+    const t = setInterval(() => setPerf(read()), 1000);
+    return () => {
+      clearInterval(t);
+      counter.stop();
     };
   }, [rig]);
 
@@ -175,6 +194,12 @@ export function App() {
           </dd>
           <dt>CPU headroom</dt>
           <dd>{headroom ? `${headroom.toFixed(1)}x real time` : "-"}</dd>
+          <dt>Frame rate</dt>
+          <dd data-testid="fps">
+            {rig
+              ? `${perf.fps.toFixed(0)} fps average, ${perf.underruns ?? "?"} audio dropout(s)`
+              : "-"}
+          </dd>
           <dt>Daemon</dt>
           <dd data-testid="daemon">
             {link === "standalone" && "standalone (no daemon): edits stay in this tab"}
@@ -190,6 +215,7 @@ export function App() {
 
 declare global {
   interface Window {
+    __rigStats?: () => { fps: number; underruns: number | null };
     __rigOffline?: (clip: number[], slots: import("@rig/shared").Slot[]) => Promise<number[]>;
     __rig?: {
       ready: boolean;

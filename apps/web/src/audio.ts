@@ -49,6 +49,13 @@ export interface ProbeResult {
 export class Rig {
   readonly sampleRate: number;
   readonly latencyMs: number;
+  /** Output underruns since start, from the browser's own playback stats; null where it has none. */
+  get underruns(): number | null {
+    return (
+      (this.ctx as unknown as { playbackStats?: { underrunEvents: number } }).playbackStats
+        ?.underrunEvents ?? null
+    );
+  }
   private readonly ctx: AudioContext;
   private tapListeners = new Set<(frame: Float32Array) => void>();
   private pairListeners = new Set<(p: Pair) => void>();
