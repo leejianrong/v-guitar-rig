@@ -33,7 +33,7 @@ None. Round 1 closed (1 of 3 rounds used).
 | Q21 | Can the agent hear | ASSUMED | Yes, via offline render returning numeric descriptors and optional spectrogram image | ADR-0006 |
 | Q22 | Failure behaviour | ASSUMED | Faulty module (compile error, throw, NaN, CPU over budget) auto-bypassed, board keeps playing, error surfaced; master limiter always on. No input device falls back to DI file | ADR-0004 |
 | Q23 | Offline/online parity | ASSUMED | Offline render matches browser output within 1e-5 for the same input | ADR-0001 |
-| Q24 | Sandbox for generated code | ASSUMED | AudioWorklet scope (no DOM/network) in browser; Node worker_threads with permission model and time budget offline | ADR-0004 |
+| Q24 | Sandbox for generated code | ASSUMED | AudioWorklet scope (no DOM/network) in browser; separate Node process with permission model, a bare vm realm and a time limit offline | ADR-0004 |
 | Q25 | Daemon exposure | ASSUMED | Binds 127.0.0.1 with per-session token; compose publishes only localhost. Hosted exposure is a later decision | ADR-0002 |
 | Q26 | Secrets | ASSUMED | Project holds no LLM credentials; the user's LLM client calls our MCP. Nothing sensitive to log | n/a |
 | Q27 | Versioning | ASSUMED | `schema: 1` field on module and board files from day one; migrations deferred | PLAN §Implementation |

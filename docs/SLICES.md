@@ -144,7 +144,7 @@ Stories are on Pandan board VGR, epic VGR-E4 (25 points).
 **Build plan**
 
 1. MCP server and CLI commands: `module new`, `module check`, `board set`, `render` with descriptors and optional spectrogram PNG.
-2. Safety gate: compile, schema, stability tests, CPU budget; Node worker with permission model.
+2. Safety gate: compile, schema, stability tests, CPU budget; sandbox process with permission model and a vm realm (not a worker: the permission model is per process).
 3. Auto-bypass on runtime fault with error returned to UI and agent.
 4. Documented agent workflow prompt (spec for the LLM client).
 
@@ -161,7 +161,7 @@ Stories are on Pandan board VGR, epic VGR-E4 (25 points).
 
 #### Integration
 
-- A module that tries `fs` or network access inside the Node worker is denied and reported with exit code 4.
+- A module that tries `fs` or network access inside the sandbox is denied and reported with exit code 4.
 - `render` returns identical descriptors on repeated runs of the same board and input.
 
 #### Unit

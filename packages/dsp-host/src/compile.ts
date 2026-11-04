@@ -1,4 +1,5 @@
 import type { ParamSpec } from "@rig/shared";
+import { BLOCK } from "./chain";
 import type { ModuleDef, Processor } from "./modules";
 import { ModuleError } from "./render";
 
@@ -27,18 +28,35 @@ function checkParam(id: string, p: ParamSpec, seen: Set<string>) {
 }
 
 /**
+ * A separate JavaScript realm (for example a `node:vm` context) in which untrusted source runs. It shares
+ * no objects with the host: a buffer or object created in the host would hand the module a route back to
+ * the host's globals (`input.constructor.constructor("return process")()`), so everything the module sees
+ * is made by the realm, and the host copies data in and out.
+ */
+export interface Realm {
+  evaluate(code: string): unknown;
+  newFloat32(length: number): Float32Array;
+  newParams(): Record<string, number>;
+}
+
+const message = (e: unknown) =>
+  String((e as { message?: unknown } | null)?.message ?? e).slice(0, 300);
+
+/**
  * Turn module source text into a `ModuleDef`. The source is a function body that returns
  * `{ id, name, category, description, params, create(sampleRate) { return { process(input, output, p) } } }`.
  *
- * This RUNS the source, so it must only be called where untrusted code is allowed to run: inside the
- * sandboxed worker (ADR-0004), never in the daemon's own process.
+ * This RUNS the source. Untrusted source must be given a `realm` and be compiled in the sandbox process
+ * (ADR-0004); without one it runs in the caller's own realm, which is for trusted code and tests only.
  */
-export function compileModule(source: string): ModuleDef {
+export function compileModule(source: string, realm?: Realm): ModuleDef {
   let spec: Record<string, unknown>;
   try {
-    spec = new Function(`"use strict";\n${source}`)();
+    spec = realm
+      ? (realm.evaluate(`(function () {\n"use strict";\n${source}\n})()`) as typeof spec)
+      : new Function(`"use strict";\n${source}`)();
   } catch (e) {
-    return bad("(source)", `does not compile: ${e instanceof Error ? e.message : String(e)}`);
+    return bad("(source)", `does not compile: ${message(e)}`);
   }
   const id = typeof spec?.id === "string" ? spec.id : "(source)";
   if (typeof spec !== "object" || spec === null) bad(id, "source must return the module object");
@@ -47,7 +65,8 @@ export function compileModule(source: string): ModuleDef {
   if (typeof spec.description !== "string") bad(id, "needs a description");
   if (!CATEGORIES.has(spec.category as string))
     bad(id, "category must be drive, time, mod or dynamics");
-  const params = spec.params as ParamSpec[];
+  // plain data copied into the host, so no object of the realm's is kept
+  const params = JSON.parse(JSON.stringify(spec.params ?? null)) as ParamSpec[];
   if (!Array.isArray(params) || params.length > MAX_PARAMS)
     bad(id, `params must be a list of at most ${MAX_PARAMS}`);
   const seen = new Set<string>();
@@ -60,6 +79,18 @@ export function compileModule(source: string): ModuleDef {
     category: spec.category as ModuleDef["category"],
     description: spec.description as string,
     params,
-    create: (sr) => create(sr),
+    create: (sr) => {
+      const proc = create(sr);
+      if (!realm) return proc;
+      const [inp, out, p] = [realm.newFloat32(BLOCK), realm.newFloat32(BLOCK), realm.newParams()];
+      return {
+        process(input, output, params) {
+          inp.set(input);
+          Object.assign(p, params);
+          proc.process(inp, out, p);
+          output.set(out);
+        },
+      };
+    },
   };
 }

@@ -19,6 +19,7 @@ RUN pnpm --filter @rig/web build && pnpm --filter @rig/daemon build
 FROM node:24-slim
 WORKDIR /app
 COPY --from=build /src/packages/daemon/dist/rig.mjs ./rig.mjs
+COPY --from=build /src/packages/daemon/dist/sandbox.mjs ./sandbox.mjs
 COPY --from=build /src/apps/web/dist ./web
 COPY --from=wasm /src/target/wasm32-unknown-unknown/release/rig_core.wasm ./rig_core.wasm
 # Inside the container the daemon must listen on all interfaces; compose publishes it on loopback only.
