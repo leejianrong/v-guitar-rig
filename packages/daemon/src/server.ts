@@ -4,7 +4,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo } from "node:net";
 import { extname, join, normalize, sep } from "node:path";
 import { MODULES, ModuleError } from "@rig/dsp-host";
-import { testClip } from "@rig/shared";
+import { type Board, testClip, validateBoard } from "@rig/shared";
 import { renderAny } from "./render";
 import { checkModule, SANDBOX_SCRIPT } from "./sandbox";
 import { RigStore } from "./store";
@@ -206,11 +206,16 @@ export async function startServer(opts: ServeOptions): Promise<Running> {
     }
     if (parts[1] === "render" && parts.length === 2 && method === "POST") {
       const body = (await readJson(req)) as {
-        board?: string;
+        board?: unknown; // a saved board's id, or a whole board to try without saving it
         seconds?: number;
         includeWav?: boolean;
       };
-      const board = store.getBoard(body.board ?? "default");
+      let board: Board | null;
+      if (typeof body.board === "object" && body.board !== null) {
+        const v = validateBoard(body.board, store.knownModules());
+        if (!v.ok) return send(res, 422, { error: "invalid", errors: v.errors });
+        board = v.board;
+      } else board = store.getBoard(String(body.board ?? "default"));
       if (!board) return send(res, 404, { error: "not_found" });
       const seconds = Math.min(30, Math.max(0.1, Number(body.seconds ?? 2)));
       const input = testClip(Math.round(seconds * 48000));
