@@ -506,12 +506,21 @@ select {
 
 .inspector {
   display: grid;
-  gap: 10px;
+  grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
+  gap: 14px 20px;
+}
+.inspector > h2,
+.inspector figure {
+  grid-column: 1 / -1;
+}
+.inspector figure.half {
+  grid-column: auto;
 }
 .inspector figure {
   margin: 0;
   display: grid;
   gap: 6px;
+  align-content: start;
 }
 .inspector canvas {
   width: 100%;
@@ -540,6 +549,8 @@ select {
   background: var(--signal);
   margin-left: 10px;
 }
-.inspector canvas.curve {
-  width: min(100%, 320px);
+@media (max-width: 700px) {
+  .inspector {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
