@@ -29,6 +29,7 @@ export function App() {
   const [rig, setRig] = useState<Rig | null>(null);
   const [source, setSource] = useState<Source>("tone");
   const [draft, setDraft] = useState<Riff | undefined>(undefined); // the riff being edited, saved or not
+  const [file, setFile] = useState<File | null>(null);
   const [playing, setPlaying] = useState(false);
   const [repeat, setRepeat] = useState(true); // the riff loops
   const [level, setLevel] = useState(0.9);
@@ -104,9 +105,10 @@ export function App() {
   }, []);
 
   async function start() {
+    if (source === "file" && !file) return setStatus("Choose an audio file first");
     setStatus("Starting audio...");
     try {
-      const r = await Rig.start(source, slots, sources, level, volume);
+      const r = await Rig.start(source, slots, sources, level, volume, file ?? undefined);
       setRig(r);
       setPlaying(source === "riff");
       setStatus("Running");
@@ -143,8 +145,20 @@ export function App() {
             <option value="tone">Test tone (110 Hz)</option>
             <option value="guitar">Guitar input</option>
             <option value="riff">Virtual guitar (riff)</option>
+            <option value="file">Audio file</option>
           </select>
         </label>
+        {source === "file" && (
+          <label>
+            File
+            <input
+              type="file"
+              accept="audio/*"
+              disabled={!!rig}
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            />
+          </label>
+        )}
         <label>
           Input level
           <input
