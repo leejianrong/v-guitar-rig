@@ -12,6 +12,7 @@ const WASM = new URL(
   "../../../target/wasm32-unknown-unknown/release/rig_core.wasm",
   import.meta.url,
 ).pathname;
+const SANDBOX = new URL("../dist/sandbox.mjs", import.meta.url).pathname; // built by test:int
 let dir: string;
 let run: Running;
 const auth = () => ({ authorization: `Bearer ${run.token}`, "content-type": "application/json" });
@@ -24,7 +25,7 @@ const cli = async (args: string[]) => {
   const code = await runCli(args, {
     out: (s) => out.push(s),
     err: (s) => err.push(s),
-    env: { RIG_WASM: WASM },
+    env: { RIG_WASM: WASM, RIG_SANDBOX: SANDBOX, RIG_TOKEN: run.token, RIG_URL: run.url },
     cwd: dir,
   });
   return { code, out: out.join(""), err: err.join("") };
@@ -32,7 +33,7 @@ const cli = async (args: string[]) => {
 
 beforeAll(async () => {
   dir = mkdtempSync(join(tmpdir(), "rig-"));
-  run = await startServer({ rigDir: dir, wasmPath: WASM, port: 0 });
+  run = await startServer({ rigDir: dir, wasmPath: WASM, sandboxScript: SANDBOX, port: 0 });
 });
 afterAll(async () => {
   await run.close();
@@ -252,5 +253,119 @@ describe("cli against the daemon", () => {
       dir,
     ]);
     expect(r.code).toBe(EXIT.validation);
+  });
+});
+
+const MODULE = (id: string, body: string) => `
+  return {
+    id: "${id}", name: "Test Echo", category: "time", description: "t",
+    params: [{ id: "amount", label: "Amount", min: 0, max: 1, default: 0.5, unit: "", taper: "linear" }],
+    create() { return { process(input, output, p) { ${body} } }; },
+  };`;
+const GAIN = "for (let i = 0; i < input.length; i++) output[i] = input[i] * (0.5 + p.amount);";
+const NAN = "for (let i = 0; i < input.length; i++) output[i] = NaN;";
+const post = (source: string, expectedRev?: number) =>
+  api("/api/modules", { method: "POST", body: JSON.stringify({ source, expectedRev }) });
+const boardWith = (module: string, rev: number) => ({
+  schema: 1,
+  id: "with-module",
+  name: "with module",
+  rev,
+  slots: [{ id: "m1", module, bypass: false, params: {} }],
+});
+const putBoard = (b: object, expectedRev: number) =>
+  api("/api/boards/with-module", {
+    method: "PUT",
+    body: JSON.stringify({ expectedRev, board: b }),
+  });
+
+describe("modules", () => {
+  it("adds a good module, lists it, puts it on a board and renders it with descriptors", async () => {
+    const r = await post(MODULE("add-gain@1", GAIN));
+    expect(r.status).toBe(200);
+    expect(await r.json()).toMatchObject({ id: "add-gain@1", rev: 1, name: "Test Echo" });
+
+    const list = (await (await api("/api/modules")).json()) as {
+      modules: { id: string; kind: string }[];
+    };
+    expect(list.modules.find((m) => m.id === "add-gain@1")?.kind).toBe("stored");
+    expect(list.modules.find((m) => m.id === "overdrive@1")?.kind).toBe("builtin");
+    expect(
+      ((await (await api("/api/modules/add-gain@1")).json()) as { source: string }).source,
+    ).toContain("output[i]");
+
+    expect((await putBoard(boardWith("add-gain@1", 0), 0)).status).toBe(200);
+    const render = async () =>
+      (await (
+        await api("/api/render", {
+          method: "POST",
+          body: JSON.stringify({ board: "with-module", seconds: 1 }),
+        })
+      ).json()) as { descriptors: object; peak: number };
+    const [a, b] = [await render(), await render()];
+    expect(a.descriptors).toEqual(b.descriptors);
+    expect(a.peak).toBeGreaterThan(0);
+  });
+
+  it("refuses a module that fails the gate, with the reason, and does not keep it", async () => {
+    const r = await post(MODULE("broken-fx@1", NAN));
+    expect(r.status).toBe(422);
+    expect(await r.json()).toMatchObject({
+      error: "module_failure",
+      message: expect.stringContaining("output is NaN"),
+    });
+    expect((await api("/api/modules/broken-fx@1")).status).toBe(404);
+    expect((await putBoard(boardWith("broken-fx@1", 0), 0)).status).toBe(422); // unknown module
+  });
+
+  it("replaces a module only with the current rev, like a board", async () => {
+    await post(MODULE("rev-fx@1", GAIN));
+    const stale = await post(MODULE("rev-fx@1", GAIN.replace("0.5", "0.6")));
+    expect(stale.status).toBe(409);
+    expect(await stale.json()).toMatchObject({ error: "stale_rev", current: { rev: 1 } });
+    const ok = await post(MODULE("rev-fx@1", GAIN.replace("0.5", "0.6")), 1);
+    expect(await ok.json()).toMatchObject({ rev: 2 });
+  });
+
+  it("needs the session token", async () => {
+    expect((await fetch(`${run.url}/api/modules`)).status).toBe(401);
+    expect((await fetch(`${run.url}/api/modules`, { method: "POST", body: "{}" })).status).toBe(
+      401,
+    );
+  });
+
+  it("is driven from the CLI: new, list, check, a refused module exits 4, a stale one exits 3, render", async () => {
+    const good = join(dir, "cli-fx.js");
+    writeFileSync(good, MODULE("cli-fx@1", GAIN));
+    expect((await cli(["module", "new", good, "--rig-dir", dir])).code).toBe(EXIT.ok);
+    expect((await cli(["module", "new", good, "--rig-dir", dir])).code).toBe(EXIT.staleRev);
+    const list = await cli(["module", "list", "--rig-dir", dir, "--json"]);
+    expect(list.out).toContain("cli-fx@1");
+    expect((await cli(["module", "check", "cli-fx@1", "--rig-dir", dir])).code).toBe(EXIT.ok);
+
+    const bad = join(dir, "bad-fx.js");
+    writeFileSync(bad, MODULE("bad-cli-fx@1", NAN));
+    const refused = await cli(["module", "new", bad, "--rig-dir", dir]);
+    expect(refused.code).toBe(EXIT.module);
+    expect(refused.err).toContain("output is NaN");
+
+    const boardFile = join(dir, "cli-board.json");
+    writeFileSync(boardFile, JSON.stringify({ ...boardWith("cli-fx@1", 0), id: "cli-board" }));
+    const out = join(dir, "cli-out.wav");
+    const r = await cli([
+      "render",
+      "--board",
+      boardFile,
+      "--seconds",
+      "1",
+      "--out",
+      out,
+      "--rig-dir",
+      dir,
+      "--json",
+    ]);
+    expect(r.code).toBe(EXIT.ok);
+    expect(JSON.parse(r.out).descriptors.rmsDb).toBeLessThan(0);
+    expect(decodeWav(readFileSync(out)).samples.length).toBe(48000);
   });
 });

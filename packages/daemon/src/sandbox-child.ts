@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 import vm from "node:vm";
 import {
   compileModule,
+  describeBoard,
   gateModule,
   MODULES,
   type ModuleDef,
@@ -17,7 +18,14 @@ import type { Board } from "@rig/shared";
 
 type Request =
   | { op: "check"; source: string; wasmPath: string }
-  | { op: "render"; sources: string[]; board: Board; input: number[]; wasmPath: string };
+  | {
+      op: "render";
+      sources: string[];
+      board: Board;
+      input: number[];
+      sampleRate: number;
+      wasmPath: string;
+    };
 
 const ctx = vm.createContext({}, { codeGeneration: { strings: true, wasm: false } });
 const inRealm = <T>(code: string) => vm.runInContext(code, ctx) as T;
@@ -45,8 +53,9 @@ function run(req: Request) {
   }
   const { wasm, defs } = load(req, req.sources);
   const registry = { ...MODULES, ...Object.fromEntries(defs.map((d) => [d.id, d])) };
-  const out = renderBoard(wasm, req.board, Float32Array.from(req.input), 48000, registry);
-  return { ok: true, output: Array.from(out) };
+  const out = renderBoard(wasm, req.board, Float32Array.from(req.input), req.sampleRate, registry);
+  const descriptors = describeBoard(wasm, req.board, out, req.sampleRate, registry);
+  return { ok: true, output: Array.from(out), descriptors };
 }
 
 let raw = "";

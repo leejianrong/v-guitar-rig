@@ -45,7 +45,9 @@ describe("sandbox", () => {
 
   it("renders a board with a generated module identically to running it in-process", async () => {
     const clip = testClip(12000);
-    const viaSandbox = await renderWithModules([module(gain)], board("test-fx@1"), clip, opts);
+    const viaSandbox = (
+      await renderWithModules([module(gain)], board("test-fx@1"), clip, 48000, opts)
+    ).output;
     const wasm = new WebAssembly.Module(readFileSync(wasmPath));
     const { compileModule } = await import("@rig/dsp-host");
     const def = compileModule(module(gain));

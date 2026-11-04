@@ -36,15 +36,16 @@ Live audio always runs in your browser; Docker cannot reach a Windows sound card
 
 ## Usage
 
-1. Choose **Test tone** to hear the board with no hardware, or **Guitar input** to play through your audio interface, then press **Start audio**. Keep your volume low at first.
-2. Build a board: add pedals from the shelf, drag them (or use the arrows) to reorder, turn knobs by dragging, arrow keys or double-click to reset, and press a footswitch to bypass. Click a jack on a cable to see the waveform and spectrogram at that point in the chain.
+1. Choose **Test tone** to hear the board with no hardware, or **Guitar input** to play through your audio interface, then press **Start audio** (and **Stop audio** to end it). Keep your volume low at first; **Output volume** sits after the limiter.
+2. Build a board: click a pedal on the shelf at the left to add it, drag a pedal by its name (or use the arrows) to reorder, turn a knob by dragging it, or click it and use the mouse wheel (arrow keys and double-click to reset also work), and press a footswitch to bypass. Click a jack on a cable to see the waveform and spectrogram at that point in the chain. Click a pedal to inspect it: before/after spectrum, input and output level, and measured transfer curve and frequency response, plus echo taps for the delay and the sweep for the chorus.
 3. For offline rendering, build the CLI and render the default board through the same DSP core:
    ```bash
    pnpm --filter @rig/daemon build
    node packages/daemon/dist/rig.mjs render --board default --seconds 5 --out out.wav
    ```
    The browser worklet and this renderer agree to within 1e-5 (measured: exactly equal on a 5 s clip).
-4. For round-trip latency, connect your interface output to an input with a cable and press **Measure loopback latency**.
+4. To add a generated pedal, write its source (the format is documented at the top of `packages/dsp-host/src/compile.ts`; ADR-0004 describes the sandbox it runs in) and `rig module new my-pedal.js` against the running daemon; it is checked in a sandbox before it is kept, and `rig module list` / `rig module check ID` show and re-check what is stored. Stored modules render offline and return descriptors (`rig render --json`); playing them in the browser is not built yet.
+5. For round-trip latency, connect your interface output to an input with a cable and press **Measure loopback latency**.
 
 The measured CPU headroom on the author's machine is about 13x per 128-frame block; hardware latency numbers are not recorded yet ([docs/hardware-checks.md](docs/hardware-checks.md)).
 

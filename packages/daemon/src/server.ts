@@ -3,14 +3,18 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { extname, join, normalize, sep } from "node:path";
-import { describeBoard, ModuleError, renderBoard } from "@rig/dsp-host";
+import { MODULES, ModuleError } from "@rig/dsp-host";
 import { testClip } from "@rig/shared";
+import { renderAny } from "./render";
+import { checkModule, SANDBOX_SCRIPT } from "./sandbox";
 import { RigStore } from "./store";
 import { encodeWav } from "./wav";
 
 export interface ServeOptions {
   rigDir: string;
   wasmPath: string;
+  /** The bundled sandbox process; defaults to the one next to this bundle. */
+  sandboxScript?: string;
   /** Directory of the built web app, served at `/` with the session token injected. */
   webDir?: string;
   host?: string;
@@ -74,6 +78,13 @@ export async function startServer(opts: ServeOptions): Promise<Running> {
   mkdirSync(join(opts.rigDir, ".rig"), { recursive: true });
   writeFileSync(join(opts.rigDir, ".rig", "token"), token, { mode: 0o600 });
 
+  const sandbox = { wasmPath: opts.wasmPath, script: opts.sandboxScript ?? SANDBOX_SCRIPT };
+  const env = { wasm, wasmPath: opts.wasmPath, sandboxScript: sandbox.script, store };
+  const moduleFailure = (res: ServerResponse, e: unknown) =>
+    e instanceof ModuleError
+      ? send(res, 422, { error: "module_failure", message: e.message })
+      : send(res, 500, { error: "internal", message: String(e) });
+
   const watchers = new Set<ServerResponse>();
   const broadcast = (board: unknown) => {
     for (const w of watchers) w.write(`data: ${JSON.stringify(board)}\n\n`);
@@ -135,6 +146,60 @@ export async function startServer(opts: ServeOptions): Promise<Running> {
         return send(res, 422, { error: "invalid", errors: r.errors });
       }
     }
+    if (parts[1] === "modules") {
+      const id = parts[2] && decodeURIComponent(parts[2]);
+      if (parts.length === 2 && method === "GET") {
+        const builtin = Object.values(MODULES).map(
+          ({ id, name, category, description, params }) => ({
+            id,
+            name,
+            category,
+            description,
+            params,
+            kind: "builtin",
+          }),
+        );
+        return send(res, 200, {
+          modules: [...builtin, ...store.listModules().map((m) => ({ ...m, kind: "stored" }))],
+        });
+      }
+      if (parts.length === 2 && method === "POST") {
+        const body = (await readJson(req)) as { source?: unknown; expectedRev?: unknown };
+        if (typeof body.source !== "string")
+          return send(res, 422, {
+            error: "invalid",
+            errors: ["`source` must be the module's code"],
+          });
+        try {
+          const info = await checkModule(body.source, sandbox);
+          const r = store.putModule(
+            info,
+            body.source,
+            typeof body.expectedRev === "number" ? body.expectedRev : undefined,
+          );
+          if (r.ok) return send(res, 200, r.module);
+          return send(res, 409, { error: "stale_rev", current: r.current });
+        } catch (e) {
+          return moduleFailure(res, e);
+        }
+      }
+      if (id && parts.length === 3 && method === "GET") {
+        const m = store.getModule(id);
+        return m
+          ? send(res, 200, { ...m.info, source: m.source })
+          : send(res, 404, { error: "not_found" });
+      }
+      if (id && parts.length === 4 && parts[3] === "check" && method === "POST") {
+        const m = store.getModule(id);
+        if (!m) return send(res, 404, { error: "not_found" });
+        try {
+          await checkModule(m.source, sandbox);
+          return send(res, 200, { ok: true, ...m.info });
+        } catch (e) {
+          return moduleFailure(res, e);
+        }
+      }
+    }
     if (parts[1] === "render" && parts.length === 2 && method === "POST") {
       const body = (await readJson(req)) as {
         board?: string;
@@ -146,7 +211,7 @@ export async function startServer(opts: ServeOptions): Promise<Running> {
       const seconds = Math.min(30, Math.max(0.1, Number(body.seconds ?? 2)));
       const input = testClip(Math.round(seconds * 48000));
       try {
-        const out = renderBoard(wasm, board, input);
+        const { output: out, descriptors } = await renderAny(env, board, input);
         let peak = 0;
         let sum = 0;
         for (const v of out) {
@@ -158,7 +223,7 @@ export async function startServer(opts: ServeOptions): Promise<Running> {
           frames: out.length,
           peak,
           rms: Math.sqrt(sum / out.length),
-          descriptors: describeBoard(wasm, board, out),
+          descriptors,
           wav: body.includeWav ? encodeWav(out, 48000).toString("base64") : undefined,
         });
       } catch (e) {

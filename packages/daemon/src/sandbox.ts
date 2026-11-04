@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { ModuleError } from "@rig/dsp-host";
+import { type Descriptors, ModuleError } from "@rig/dsp-host";
 import type { Board } from "@rig/shared";
 
 /** Where the bundled sandbox process lives: next to the daemon bundle. */
@@ -77,11 +77,12 @@ export async function renderWithModules(
   sources: string[],
   board: Board,
   input: Float32Array,
+  sampleRate: number,
   o: Options,
-): Promise<Float32Array> {
-  const r = await call<{ output: number[] }>(
-    { op: "render", sources, board, input: Array.from(input) },
+): Promise<{ output: Float32Array; descriptors: Descriptors }> {
+  const r = await call<{ output: number[]; descriptors: Descriptors }>(
+    { op: "render", sources, board, input: Array.from(input), sampleRate },
     o,
   );
-  return Float32Array.from(r.output);
+  return { output: Float32Array.from(r.output), descriptors: r.descriptors };
 }
