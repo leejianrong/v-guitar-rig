@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { ModuleError } from "@rig/dsp-host";
-import { type Board, testClip, validateBoard } from "@rig/shared";
+import { type Board, type Preset, testClip, validateBoard } from "@rig/shared";
 import { daemonClient } from "./client";
 import { runMcp } from "./mcp";
 import { renderAny } from "./render";
@@ -54,6 +54,7 @@ const USAGE = `rig: virtual guitar rig
   rig module new FILE.js [--expected-rev N]   add a generated module (checked in the sandbox first)
   rig module check ID                         re-run the safety gate on a stored module
   rig module list
+  rig preset list | get ID | new FILE.json [--expected-rev N]   presets (a board plus tags)
   rig mcp [--url URL] [--rig-dir DIR]          MCP server on stdio for an LLM client (needs a running daemon)
 
 Exit codes: 0 ok, 1 error, 2 validation, 3 stale rev, 4 module failure.`;
@@ -153,7 +154,11 @@ export async function runCli(argv: string[], io: Io): Promise<number> {
       return EXIT.ok;
     }
 
-    if ((cmd === "board" && (sub === "get" || sub === "set")) || cmd === "module") {
+    if (
+      (cmd === "board" && (sub === "get" || sub === "set")) ||
+      cmd === "module" ||
+      cmd === "preset"
+    ) {
       const call = daemonClient(
         str("url") ?? io.env.RIG_URL ?? "http://127.0.0.1:7878",
         rigDir,
@@ -168,6 +173,19 @@ export async function runCli(argv: string[], io: Io): Promise<number> {
       let res: Awaited<ReturnType<typeof call>>;
       if (cmd === "board" && sub === "get") {
         res = await call("GET", `/api/boards/${need("a board id", pos[2])}`);
+      } else if (cmd === "preset" && sub === "list") {
+        res = await call("GET", "/api/presets");
+      } else if (cmd === "preset" && sub === "get") {
+        res = await call("GET", `/api/presets/${need("a preset id", pos[2])}`);
+      } else if (cmd === "preset" && sub === "new") {
+        const preset = JSON.parse(
+          readFileSync(resolve(io.cwd, need("a preset file", pos[2])), "utf8"),
+        ) as Preset;
+        const rev = str("expected-rev");
+        res = await call("PUT", `/api/presets/${preset.id}`, {
+          expectedRev: rev === undefined ? 0 : Number(rev),
+          preset,
+        });
       } else if (cmd === "board") {
         const board = JSON.parse(
           readFileSync(resolve(io.cwd, need("a board file", pos[2])), "utf8"),
