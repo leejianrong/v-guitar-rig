@@ -67,6 +67,16 @@ const delay: ModuleDef = {
     },
     { id: "mix", label: "Mix", min: 0, max: 1, default: 0.3, unit: "", taper: "linear" },
   ],
+  visual: (p) => {
+    const [ms, fb, mix] = [p.time ?? 380, p.feedback ?? 0, p.mix ?? 0];
+    const taps = [];
+    for (let n = 1; n <= 16 && n * ms <= 3000; n++) {
+      const level = mix * fb ** (n - 1);
+      if (level < 0.01) break;
+      taps.push({ ms: n * ms, level });
+    }
+    return { kind: "echoes", taps };
+  },
   create(sr) {
     const buf = new Float32Array(Math.ceil(sr * 1.05));
     let w = 0;
@@ -98,6 +108,12 @@ const chorus: ModuleDef = {
     { id: "depth", label: "Depth", min: 0, max: 1, default: 0.5, unit: "", taper: "linear" },
     { id: "mix", label: "Mix", min: 0, max: 1, default: 0.5, unit: "", taper: "linear" },
   ],
+  visual: (p) => ({
+    kind: "sweep",
+    rateHz: p.rate ?? 1,
+    minMs: 12 - 6 * (p.depth ?? 0),
+    maxMs: 12 + 6 * (p.depth ?? 0),
+  }),
   create(sr) {
     const buf = new Float32Array(Math.ceil(sr * 0.05));
     let w = 0;

@@ -7,12 +7,23 @@ export interface Processor {
   process(input: Float32Array, output: Float32Array, p: Readonly<Record<string, number>>): void;
 }
 
+/**
+ * What a time-based module declares so the host can draw it (ADR-0005: modules never draw). Plain data,
+ * computed from the knob values, so generated modules can declare one too.
+ */
+export type Visual =
+  /** Echoes after the dry sound: when each arrives and how loud, relative to the dry level of 1. */
+  | { kind: "echoes"; taps: { ms: number; level: number }[] }
+  /** A delay time swept sinusoidally between `minMs` and `maxMs`, `rateHz` times a second. */
+  | { kind: "sweep"; rateHz: number; minMs: number; maxMs: number };
+
 export interface ModuleDef {
   id: string;
   name: string;
   category: "drive" | "time" | "mod" | "dynamics";
   description: string;
   params: ParamSpec[];
+  visual?(params: Readonly<Record<string, number>>): Visual;
   create(sampleRate: number, wasm: WebAssembly.Module): Processor;
 }
 

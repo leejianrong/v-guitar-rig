@@ -17,14 +17,20 @@ export async function benchmarkHeadroom(): Promise<number> {
   chain.setSlots([{ id: "b", module: "diode-clipper@1", bypass: false, params: {} }]);
   const inp = new Float32Array(BLOCK);
   const out = new Float32Array(BLOCK);
-  const blocks = 1500;
-  const t0 = performance.now();
-  for (let b = 0; b < blocks; b++) {
-    for (let i = 0; i < BLOCK; i++)
-      inp[i] = 0.9 * Math.sin((2 * Math.PI * 110 * (b * BLOCK + i)) / 48000);
-    chain.process(inp, out);
+  const blocks = 500;
+  // best of three: another thread or tab stealing the CPU only ever makes a pass slower
+  let fastest = Number.POSITIVE_INFINITY;
+  for (let pass = 0; pass < 3; pass++) {
+    const t0 = performance.now();
+    for (let b = 0; b < blocks; b++) {
+      for (let i = 0; i < BLOCK; i++)
+        inp[i] = 0.9 * Math.sin((2 * Math.PI * 110 * (b * BLOCK + i)) / 48000);
+      chain.process(inp, out);
+    }
+    fastest = Math.min(fastest, (performance.now() - t0) / blocks);
+    await new Promise((r) => setTimeout(r)); // let the page and audio thread run between passes
   }
-  return ((BLOCK / 48000) * 1000) / ((performance.now() - t0) / blocks);
+  return ((BLOCK / 48000) * 1000) / fastest;
 }
 
 /** The signal going into and coming out of one pedal over the same stretch of time. */
