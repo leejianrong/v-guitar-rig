@@ -1,4 +1,5 @@
 import { createInterface } from "node:readline";
+import { TONE_RULES } from "@rig/shared";
 import type { Reply } from "./client";
 
 type Call = (method: string, path: string, body?: unknown) => Promise<Reply>;
@@ -34,8 +35,18 @@ Workflow:
 2. Write the source and call new_module. A failure gives the reason (compile error, NaN or Inf, output growing without bound, too slow, throwing). Fix that and call new_module again; replacing an id needs expectedRev from get_module.
 3. get_board, add your module to slots, and render that board object to try it without saving; call set_board once you want it kept. A slot is {id: <any unique string>, module: <module id>, bypass: false, params: {}}. The board object's own rev is used as expectedRev unless you pass one; on a stale rev, get_board again.
 4. render the board and read the descriptors, which describe the whole board's output, not your pedal alone. To judge one pedal, render once with it bypassed (a copy of the board with bypass: true) and once active, and compare.
-   Descriptors: rmsDb, peakDb, crestDb (peak minus rms); centroidHz (spectral centre, lower = darker); rolloffHz (below it lies 85% of the energy); bandsDb in dB relative to the total over low 20-200 Hz, lowMid 200-800, mid 800-3k, high 3k-8k, air 8k+; thdPercent (energy at harmonics 2-8 of a 110 Hz tone, so a drive raises it, and a comb-like delay or chorus changes it too, so only trust it for drive). Expected moves: more drive raises thdPercent and lowers crestDb; a darker tone lowers centroidHz and the high and air bands; more wet delay or reverb raises rmsDb and may raise crestDb as echoes add to peaks. Adjust params or code and repeat.
+   Descriptors: rmsDb, peakDb, crestDb (peak minus rms); centroidHz (spectral centre, lower = darker); rolloffHz (below it lies 85% of the energy); bandsDb in dB relative to the total over low 20-200 Hz, lowMid 200-800, mid 800-3k, high 3k-8k, air 8k+; tailMs (ms a tone rings on after you stop, to -60 dB; 6000 is the cap); thdPercent (energy at harmonics 2-8 of a 110 Hz tone, so a drive raises it, and a comb-like delay or chorus changes it too, so only trust it for drive). Expected moves: more drive raises thdPercent and lowers crestDb; a darker tone lowers centroidHz and the high and air bands; more wet delay or reverb raises rmsDb and may raise crestDb as echoes add to peaks. Adjust params or code and repeat.
 Output must stay finite and at or below 8x full scale on the gate's tests (impulse, noise, square, DC, at default, minimum and maximum knobs), and not grow over time, or the module is rejected. A master limiter is always on.`;
+
+/** How to nudge a loaded board by tone words, served as the `tune-a-tone` prompt. */
+export const TONE_GUIDE = `Tuning a board by tone words: change a few knobs, render, and read the descriptor that should move.
+
+"spacier", "dreamier", "more ambient": apply these moves with set_board (or render the edited board first), then check that tailMs rose (it measured at least +1000 ms on every starter preset, capped at 6000) and that peakDb is still below 0. If it is not, lower the amp's master by the overshoot. A delay or reverb the board lacks is added first.
+${TONE_RULES.spacier.steps
+  .map((st) => `  ${st.module} ${st.param}: +${st.by} (at most ${st.max}; ${st.fallback} if unset)`)
+  .join("\n")}
+
+Other words: change one or two knobs and read the descriptor that should move: centroidHz for bright or dark, thdPercent for gain, tailMs for space. tailMs is how long a tone rings on after you stop playing, measured to -60 dB.`;
 
 const obj = (properties: Args, required: string[] = []) => ({
   type: "object",
@@ -111,7 +122,7 @@ const TOOLS = [
   {
     name: "render",
     description:
-      "Render a board over a guitar-like test clip and return level, peak and descriptors: rmsDb, peakDb, crestDb, centroidHz, rolloffHz, bandsDb, thdPercent.",
+      "Render a board over a guitar-like test clip and return level, peak and descriptors: rmsDb, peakDb, crestDb, centroidHz, rolloffHz, bandsDb, thdPercent, tailMs.",
     inputSchema: obj({
       board: {
         description:
@@ -189,12 +200,18 @@ export async function handle(call: Call, msg: { id?: unknown; method: string; pa
       return reply({
         prompts: [
           { name: "build-a-pedal", description: "How to write, test and play a new pedal." },
+          { name: "tune-a-tone", description: "How to nudge a board with words like spacier." },
         ],
       });
     case "prompts/get":
-      return p.name === "build-a-pedal"
+      return p.name === "build-a-pedal" || p.name === "tune-a-tone"
         ? reply({
-            messages: [{ role: "user", content: { type: "text", text: WORKFLOW } }],
+            messages: [
+              {
+                role: "user",
+                content: { type: "text", text: p.name === "tune-a-tone" ? TONE_GUIDE : WORKFLOW },
+              },
+            ],
           })
         : fail(-32602, `no prompt ${String(p.name)}`);
     case "tools/call": {

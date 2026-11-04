@@ -1,5 +1,6 @@
+import type { Board } from "@rig/shared";
 import { describe, expect, it } from "vitest";
-import { spectralDescriptors, thdPercent } from "./describe";
+import { describeBoard, spectralDescriptors, tailMs, thdPercent } from "./describe";
 
 const SR = 48000;
 const sine = (hz: number, amp: number, n = SR) =>
@@ -59,5 +60,59 @@ describe("thdPercent", () => {
     for (let n = 2; n <= 8; n++) h += harmonic(x, 100, n) ** 2;
     const expected = (100 * Math.sqrt(h)) / f;
     expect(Math.abs(thdPercent(x, SR, 100) - expected) / expected).toBeLessThan(0.03);
+  });
+});
+
+describe("tailMs", () => {
+  const SR = 48000;
+  const tone = Float32Array.from(
+    { length: SR },
+    (_, i) => 0.25 * Math.sin((2 * Math.PI * 110 * i) / SR),
+  );
+
+  it("reads a known exponential decay: 60 dB takes tau * ln(1000)", () => {
+    const tau = 0.1; // seconds
+    const after = Float32Array.from(
+      { length: SR * 6 },
+      (_, i) => 0.25 * Math.exp(-i / SR / tau) * Math.sin((2 * Math.PI * 110 * i) / SR),
+    );
+    expect(Math.abs(tailMs(tone, after, SR) - tau * Math.log(1000) * 1000)).toBeLessThan(25);
+  });
+
+  it("is zero when the sound stops at once, and for silence", () => {
+    expect(tailMs(tone, new Float32Array(SR * 6), SR)).toBe(0);
+    expect(tailMs(new Float32Array(SR), new Float32Array(SR * 6), SR)).toBe(0);
+  });
+
+  it("matches the hand-computed decay of a feedback delay", () => {
+    // 100 ms is 11 periods of 110 Hz, so every echo adds in phase. The wet level after the tone stops is
+    // 2A * g^n in the n-th 100 ms (A = tone amplitude), against 3A while playing, so it is above -60 dB
+    // while (2/3) * 0.5^n >= 0.001, i.e. through n = 9: the tail ends at 10 * 100 ms = 1000 ms.
+    const board: Board = {
+      schema: 1,
+      id: "t",
+      name: "t",
+      rev: 0,
+      slots: [
+        { id: "d", module: "delay@1", bypass: false, params: { time: 100, feedback: 0.5, mix: 1 } },
+      ],
+    };
+    const d = describeBoard({} as WebAssembly.Module, board, new Float32Array(SR), SR);
+    expect(Math.abs(d.tailMs - 1000)).toBeLessThan(25);
+  });
+
+  it("is longer with more feedback and a bigger reverb, and short for a bare amp", () => {
+    const tail = (slots: Board["slots"]) =>
+      describeBoard(
+        {} as WebAssembly.Module,
+        { schema: 1, id: "t", name: "t", rev: 0, slots },
+        new Float32Array(SR),
+        SR,
+      ).tailMs;
+    const delay = (feedback: number) => [
+      { id: "d", module: "delay@1", bypass: false, params: { time: 300, feedback, mix: 0.4 } },
+    ];
+    expect(tail(delay(0.8))).toBeGreaterThan(tail(delay(0.3)) + 500);
+    expect(tail([{ id: "a", module: "amp@1", bypass: false, params: {} }])).toBeLessThan(100);
   });
 });
