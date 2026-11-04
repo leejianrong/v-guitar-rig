@@ -167,3 +167,32 @@ test("delay draws its echo taps and moves them with Time; chorus draws its sweep
     .getByRole("region", { name: "Pedal inspector" })
     .screenshot({ path: "test-results/sweep.png" });
 });
+
+test("inspector views share rows on a wide screen and stack on a phone without overflow", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/");
+  await page.getByTestId("pedal-diode-clipper@1").getByRole("heading").click();
+  const box = async (name: string) => {
+    const b = await page.getByLabel(name).boundingBox();
+    if (!b) throw new Error(`${name} not visible`);
+    return b;
+  };
+  const [curve, resp] = [
+    await box("Transfer curve: level out against level in"),
+    await box("Frequency response at a small signal level"),
+  ];
+  expect(Math.abs(curve.y - resp.y)).toBeLessThan(2); // same row
+  expect(resp.x).toBeGreaterThan(curve.x + curve.width);
+  await page.screenshot({ path: "test-results/wide.png", fullPage: true });
+
+  await page.setViewportSize({ width: 390, height: 800 });
+  const [c2, r2] = [
+    await box("Transfer curve: level out against level in"),
+    await box("Frequency response at a small signal level"),
+  ];
+  expect(r2.y).toBeGreaterThan(c2.y + c2.height - 1); // stacked
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await page.screenshot({ path: "test-results/phone.png", fullPage: true });
+});

@@ -22,8 +22,9 @@ const H = 200;
 const ENV_H = 110;
 const ENV_DB_MIN = -54;
 const ENV_DB_MAX = 6; // headroom above full scale, so a full-scale signal does not hug the edge
-const RESP_H = 160;
-const CURVE = 220; // square plot, in canvas pixels
+const RESP_W = 600; // drawn at about the size it is shown, so the labels stay legible
+const RESP_H = 320;
+const CURVE = 320; // square plot, in canvas pixels
 const CURVE_DB = [-60, 6] as const;
 const HISTORY = 160; // frames of envelope shown, about 7 s
 
@@ -49,7 +50,7 @@ export const pairLevels = (freq = 110) =>
     envAfterDb: latest.envDb[1],
   };
 
-const xOf = (f: number) => (Math.log(f / F_MIN) / Math.log(F_MAX / F_MIN)) * W;
+const xOf = (f: number, w = W) => (Math.log(f / F_MIN) / Math.log(F_MAX / F_MIN)) * w;
 const yOf = (db: number) => (Math.max(DB_MIN, Math.min(0, db)) / DB_MIN) * H; // 0 dB at the top
 
 function trace(g: CanvasRenderingContext2D, db: Float32Array, rate: number, colour: string) {
@@ -180,7 +181,7 @@ function drawResponse(c: HTMLCanvasElement, curve: ResponsePoint[]) {
   const top = Math.ceil(Math.max(...curve.map((p) => p.db)) / 6) * 6 + 6; // a 48 dB window under the peak
   const y = (db: number) => ((top - Math.max(top - 48, Math.min(top, db))) / 48) * RESP_H;
   g.fillStyle = "#0b0d0f";
-  g.fillRect(0, 0, W, RESP_H);
+  g.fillRect(0, 0, RESP_W, RESP_H);
   g.font = "11px 'IBM Plex Mono', monospace";
   g.fillStyle = "#8d949b";
   g.strokeStyle = "#1f2429";
@@ -188,22 +189,22 @@ function drawResponse(c: HTMLCanvasElement, curve: ResponsePoint[]) {
   for (let db = top - 12; db > top - 48; db -= 12) {
     g.beginPath();
     g.moveTo(0, y(db));
-    g.lineTo(W, y(db));
+    g.lineTo(RESP_W, y(db));
     g.stroke();
     g.fillText(`${db >= 0 ? "+" : ""}${db} dB`, 6, y(db) - 3);
   }
   for (const f of [100, 1000, 10000]) {
     g.beginPath();
-    g.moveTo(xOf(f), 0);
-    g.lineTo(xOf(f), RESP_H);
+    g.moveTo(xOf(f, RESP_W), 0);
+    g.lineTo(xOf(f, RESP_W), RESP_H);
     g.stroke();
-    g.fillText(f >= 1000 ? `${f / 1000}k` : `${f}`, xOf(f) + 4, RESP_H - 6);
+    g.fillText(f >= 1000 ? `${f / 1000}k` : `${f}`, xOf(f, RESP_W) + 4, RESP_H - 6);
   }
   g.strokeStyle = "#ffb347";
   g.lineWidth = 2;
   g.beginPath();
-  for (let x = 0; x < W; x++) {
-    const hz = F_MIN * (F_MAX / F_MIN) ** (x / W);
+  for (let x = 0; x < RESP_W; x++) {
+    const hz = F_MIN * (F_MAX / F_MIN) ** (x / RESP_W);
     const at = Math.min(curve.length - 2, Math.max(0, hz / (curve[0]?.hz ?? 1) - 1));
     const [lo, t] = [Math.floor(at), at - Math.floor(at)];
     const db = (curve[lo]?.db ?? 0) * (1 - t) + (curve[lo + 1]?.db ?? 0) * t;
@@ -286,7 +287,7 @@ export function Inspector({ def, slot, rig }: { def: ModuleDef; slot: Slot; rig:
         </figcaption>
       </figure>
       {visual && <VisualView visual={visual} />}
-      <figure>
+      <figure className="half">
         <canvas
           ref={curveCanvas}
           width={CURVE}
@@ -298,10 +299,10 @@ export function Inspector({ def, slot, rig }: { def: ModuleDef; slot: Slot; rig:
           measured transfer curve (dashed: a plain wire) · {summary}
         </figcaption>
       </figure>
-      <figure>
+      <figure className="half">
         <canvas
           ref={respCanvas}
-          width={W}
+          width={RESP_W}
           height={RESP_H}
           aria-label="Frequency response at a small signal level"
         />
