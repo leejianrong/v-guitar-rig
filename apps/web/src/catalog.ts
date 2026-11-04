@@ -80,6 +80,19 @@ export const missingModules = (preset: Preset, catalog: Catalog): string[] => [
 export const slotsOf = (preset: Preset): Slot[] =>
   preset.slots.map((s) => ({ ...s, id: crypto.randomUUID(), params: { ...s.params } }));
 
+/** True while the board is exactly the preset: same pedals in order, bypass and knob values. Any edit ends it. */
+export const matchesPreset = (slots: Slot[], preset: Preset): boolean =>
+  slots.length === preset.slots.length &&
+  slots.every((s, i) => {
+    const p = preset.slots[i] as Slot;
+    const keys = new Set([...Object.keys(s.params), ...Object.keys(p.params)]);
+    return (
+      s.module === p.module &&
+      s.bypass === p.bypass &&
+      [...keys].every((k) => s.params[k] === p.params[k])
+    );
+  });
+
 /** Save a riff to the daemon. `expectedRev` is 0 for a new one, else the rev being replaced. */
 export async function saveRiff(
   riff: Riff,

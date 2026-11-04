@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Virtual Guitar Rig</title>
+  <defs>
+    <linearGradient id="enamel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2f6a58"/>
+      <stop offset="1" stop-color="#18392f"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="url(#enamel)"/>
+  <rect x="2.75" y="2.75" width="58.5" height="58.5" rx="13.25" fill="none" stroke="#fff" stroke-opacity=".14" stroke-width="1.5"/>
+  <path d="M7 32 C12 32 14 17 20 17 L25 17 C31 17 31 47 37 47 L42 47 C48 47 50 32 57 32"
+        fill="none" stroke="#ffb347" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="51" cy="12" r="3.2" fill="#ff3b2f"/>
+</svg>

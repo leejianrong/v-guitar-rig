@@ -3,7 +3,14 @@ import type { Riff } from "@rig/shared";
 import { useEffect, useRef, useState } from "react";
 import { benchmarkHeadroom, loadWasm, Rig, type Source } from "./audio";
 import { useBoard } from "./board-state";
-import { missingModules, slotsOf, useCatalog, usePresets, useRiffs } from "./catalog";
+import {
+  matchesPreset,
+  missingModules,
+  slotsOf,
+  useCatalog,
+  usePresets,
+  useRiffs,
+} from "./catalog";
 import { FrameCounter } from "./frames";
 import { renderOffline } from "./offline";
 import { Board, tapLabel } from "./ui/Board";
@@ -122,7 +129,10 @@ export function App() {
   return (
     <main>
       <header className="bar">
-        <h1>Virtual Guitar Rig</h1>
+        <h1>
+          <img className="logo" src="/favicon.svg" alt="" width="34" height="34" />
+          Virtual Guitar Rig
+        </h1>
         <label>
           Source
           <select
@@ -191,6 +201,7 @@ export function App() {
         <Library
           catalog={catalog}
           presets={presets}
+          activeId={presets.find((p) => matchesPreset(slots, p))?.id ?? null}
           onLoad={(p) => {
             const missing = missingModules(p, catalog);
             if (missing.length > 0) {

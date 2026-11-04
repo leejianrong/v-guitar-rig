@@ -772,3 +772,35 @@ kbd {
   font-size: 12px;
   color: var(--muted);
 }
+
+/* collapsible shelf sections and the loaded preset */
+h1 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.logo {
+  display: block;
+  border-radius: 8px;
+}
+.shelf summary {
+  cursor: pointer;
+  list-style: none;
+}
+.shelf summary::-webkit-details-marker {
+  display: none;
+}
+.shelf summary h2::before {
+  content: "▾";
+  display: inline-block;
+  width: 1ch;
+  color: var(--muted);
+}
+.shelf details:not([open]) summary h2::before {
+  content: "▸";
+}
+.shelf .presets li button[aria-current="true"] {
+  border-color: var(--signal);
+  background: #2a2210;
+  box-shadow: inset 3px 0 0 var(--signal);
+}
