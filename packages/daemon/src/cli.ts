@@ -2,6 +2,8 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { ModuleError } from "@rig/dsp-host";
 import { type Board, testClip, validateBoard } from "@rig/shared";
+import { daemonClient } from "./client";
+import { runMcp } from "./mcp";
 import { renderAny } from "./render";
 import { SANDBOX_SCRIPT } from "./sandbox";
 import { startServer } from "./server";
@@ -52,6 +54,7 @@ const USAGE = `rig: virtual guitar rig
   rig module new FILE.js [--expected-rev N]   add a generated module (checked in the sandbox first)
   rig module check ID                         re-run the safety gate on a stored module
   rig module list
+  rig mcp [--url URL] [--rig-dir DIR]          MCP server on stdio for an LLM client (needs a running daemon)
 
 Exit codes: 0 ok, 1 error, 2 validation, 3 stale rev, 4 module failure.`;
 
@@ -139,30 +142,23 @@ export async function runCli(argv: string[], io: Io): Promise<number> {
       return EXIT.ok;
     }
 
+    if (cmd === "mcp") {
+      await runMcp(
+        daemonClient(
+          str("url") ?? io.env.RIG_URL ?? "http://127.0.0.1:7878",
+          rigDir,
+          io.env.RIG_TOKEN,
+        ),
+      );
+      return EXIT.ok;
+    }
+
     if ((cmd === "board" && (sub === "get" || sub === "set")) || cmd === "module") {
-      const call = async (method: string, path: string, body?: unknown) => {
-        const base = str("url") ?? io.env.RIG_URL ?? "http://127.0.0.1:7878";
-        let token = io.env.RIG_TOKEN;
-        if (!token) {
-          try {
-            token = readFileSync(join(rigDir, ".rig", "token"), "utf8").trim();
-          } catch {
-            throw new Error(
-              "no token: set RIG_TOKEN or point --rig-dir at the daemon's rig directory",
-            );
-          }
-        }
-        const res = await fetch(`${base}${path}`, {
-          method,
-          headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-          body: body === undefined ? undefined : JSON.stringify(body),
-        });
-        return {
-          ok: res.ok,
-          status: res.status,
-          body: (await res.json()) as Record<string, unknown>,
-        };
-      };
+      const call = daemonClient(
+        str("url") ?? io.env.RIG_URL ?? "http://127.0.0.1:7878",
+        rigDir,
+        io.env.RIG_TOKEN,
+      );
       const need = (what: string, v: string | undefined) => {
         if (v) return v;
         throw Object.assign(new Error(`rig ${cmd} ${sub} needs ${what}`), {
